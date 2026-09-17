@@ -10,6 +10,7 @@ import {
   type ChangeDetails, type ElementRef, type OpenReason, type Style,
 } from './foundations'
 import { menuItemStyle, popupListStyle, useItemCollection, useItemRegistration, useListNavigation } from './surface'
+import { Chevron } from './chevron'
 
 export type ChooserItem = { value: string; label: string; disabled?: boolean }
 export type ChooserGroup = { label: string; items: ChooserItem[] }
@@ -145,8 +146,8 @@ function SelectTrigger(props: { children: ReactNode; style?: Style; testId?: str
       paddingRight: 11,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: focused || select.open ? C.primary : C.borderStrong,
-      backgroundColor: hovered && !select.open ? C.panelRaised : C.input,
+      borderColor: C.borderStrong,
+      backgroundColor: C.input,
       cursor: disabled ? 'default' : 'pointer',
       opacity: disabled ? 0.5 : 1,
       userSelect: 'none',
@@ -171,7 +172,7 @@ function SelectValue(props: { placeholder?: string; children?: ReactNode | ((val
 function SelectIcon(props: { children?: ReactNode }) {
   const { tokens: C } = useTheme()
   const select = useSelect('Select.Icon')
-  return <text style={{ width: 18, fontFamily: 'Helvetica', fontSize: 15, color: select.open ? C.text : C.muted, textAlign: 'center' }}>{props.children ?? (select.open ? '⌃' : '⌄')}</text>
+  return props.children ? <text style={{ width: 18, fontFamily: 'Helvetica', fontSize: 15, color: select.open ? C.text : C.muted, textAlign: 'center' }}>{props.children}</text> : <Chevron open={select.open} size={12} />
 }
 
 function SelectPortal(props: { children: ReactNode }) { return <>{props.children}</> }
@@ -465,7 +466,7 @@ function FilterableInputGroup(props: { children: ReactNode; style?: Style }) {
       paddingRight: 8,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: focused || filterable.open ? C.primary : hovered ? C.borderStrong : C.border,
+      borderColor: filterable.open ? C.borderStrong : C.border,
       backgroundColor: C.input,
       opacity: filterable.disabled ? 0.5 : 1,
       cursor: filterable.disabled ? 'default' : 'text',
@@ -546,14 +547,14 @@ function FilterableTrigger(props: { children?: ReactNode; style?: Style; testId?
   })
   const ariaProps = { 'aria-expanded': filterable.open }
   return <div {...pressProps} {...ariaProps} testId={props.testId} aria-label={props.ariaLabel} style={mergeStyle({ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, cursor: 'pointer', hover: { backgroundColor: C.control } }, props.style)}>
-    {props.children ?? <text style={{ fontFamily: 'Helvetica', fontSize: 14, color: C.muted }}>{filterable.open ? '⌃' : '⌄'}</text>}
+    {props.children ?? <Chevron open={filterable.open} size={11} />}
   </div>
 }
 
 function FilterableIcon(props: { children?: ReactNode }) {
   const { tokens: C } = useTheme()
   const filterable = useFilterable('Icon')
-  return <text style={{ width: 18, fontFamily: 'Helvetica', fontSize: 14, color: filterable.open ? C.text : C.muted, textAlign: 'center' }}>{props.children ?? '⌄'}</text>
+  return props.children ? <text style={{ width: 18, fontFamily: 'Helvetica', fontSize: 14, color: filterable.open ? C.text : C.muted, textAlign: 'center' }}>{props.children}</text> : <Chevron open={filterable.open} size={11} />
 }
 
 function FilterableClear(props: { children?: ReactNode; keepMounted?: boolean; testId?: string }) {
@@ -564,7 +565,7 @@ function FilterableClear(props: { children?: ReactNode; keepMounted?: boolean; t
     onPress: (event) => { filterable.setValue([], 'input-clear', event); filterable.setQuery('', event) },
   })
   if (filterable.value.length === 0 && !props.keepMounted) return null
-  return <div {...pressProps} testId={props.testId} style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: hovered ? C.control : 'transparent', cursor: 'pointer' }}>
+  return <div {...pressProps} testId={props.testId} style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: 'transparent', cursor: 'pointer' }}>
     {props.children ?? <text style={{ fontFamily: 'Helvetica', fontSize: 14, color: C.muted }}>×</text>}
   </div>
 }
@@ -606,7 +607,7 @@ function FilterableChipRemove(props: { value: string; children?: ReactNode; test
     disabled: filterable.disabled || filterable.readOnly,
     onPress: (event) => filterable.setValue(filterable.value.filter((entry) => entry !== props.value), 'input-clear', event),
   })
-  return <div {...pressProps} testId={props.testId} style={{ width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, backgroundColor: hovered ? C.control : 'transparent', cursor: 'pointer' }}>
+  return <div {...pressProps} testId={props.testId} style={{ width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, backgroundColor: 'transparent', cursor: 'pointer' }}>
     {props.children ?? <text style={{ fontFamily: 'Helvetica', fontSize: 11, color: C.selectedForeground }}>×</text>}
   </div>
 }
@@ -842,21 +843,21 @@ function NavigationMenuTrigger(props: { children: ReactNode; value?: string; dis
       paddingLeft: 12,
       paddingRight: 12,
       borderRadius: 8,
-      backgroundColor: active ? C.selected : hovered ? C.control : 'transparent',
-      borderWidth: focused ? 1 : 0,
+      backgroundColor: active ? C.selected : 'transparent',
+      borderWidth: 0,
       borderColor: C.primary,
       cursor: 'pointer',
       userSelect: 'none',
     }, props.style)}
   >
     <text style={{ fontFamily: 'Helvetica', fontSize: 13, fontWeight: active ? 700 : 500, color: active ? C.selectedForeground : C.text }}>{props.children}</text>
-    <NavigationMenuIcon />
+    <NavigationMenuIcon open={active} />
   </div>
 }
 
-function NavigationMenuIcon(props: { children?: ReactNode }) {
+function NavigationMenuIcon(props: { children?: ReactNode; open?: boolean }) {
   const { tokens: C } = useTheme()
-  return <text style={{ fontFamily: 'Helvetica', fontSize: 11, color: C.muted }}>{props.children ?? '⌄'}</text>
+  return props.children ? <text style={{ fontFamily: 'Helvetica', fontSize: 11, color: C.muted }}>{props.children}</text> : <Chevron open={props.open} size={11} />
 }
 
 function NavigationMenuContent(props: { value?: string; children: ReactNode; style?: Style; testId?: string; keepMounted?: boolean }) {
@@ -907,8 +908,8 @@ function NavigationMenuLink(props: { children: ReactNode; active?: boolean; clos
       paddingLeft: 10,
       paddingRight: 10,
       borderRadius: 7,
-      backgroundColor: props.active ? C.selected : hovered ? C.control : 'transparent',
-      borderWidth: focused ? 1 : 0,
+      backgroundColor: props.active ? C.selected : 'transparent',
+      borderWidth: 0,
       borderColor: C.primary,
       cursor: 'pointer',
     }, props.style)}

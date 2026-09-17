@@ -2,7 +2,7 @@ import {
   createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore,
   type ReactNode, type RefObject,
 } from 'react'
-import { useGpuix } from '@gpuix/react'
+import { useGpuix, useWindowSize } from '@gpuix/react'
 import type { EventPayload } from '@gpuix/native'
 import type { PublicInstance as Instance } from '@gpuix/react'
 import { useTheme, type ThemeTokens } from '../theme-context'
@@ -10,13 +10,9 @@ import {
   clamp, formatNumber, mergeStyle, ratioOf, useBounds, useControllableState, usePress, useRovingFocus,
   type ChangeDetails, type Style,
 } from './foundations'
+import { Chevron } from './chevron'
 
 type Roving = ReturnType<typeof useRovingFocus>
-
-function Chevron({ open }: { open: boolean }) {
-  const { tokens: C } = useTheme()
-  return <text style={{ fontFamily: 'Helvetica', fontSize: 15, color: C.muted }}>{open ? '⌃' : '⌄'}</text>
-}
 
 type AccordionContextValue = {
   open: string[]
@@ -98,8 +94,8 @@ function AccordionTrigger(props: { children: ReactNode; style?: Style; testId?: 
       justifyContent: 'space-between',
       paddingLeft: 13,
       paddingRight: 13,
-      backgroundColor: hovered ? C.panelRaised : C.control,
-      borderWidth: focused ? 1 : 0,
+      backgroundColor: C.control,
+      borderWidth: 0,
       borderColor: C.primary,
       cursor: item.disabled ? 'default' : 'pointer',
     }, props.style)}
@@ -452,12 +448,12 @@ function TabsTab(props: { value: string | number; disabled?: boolean; children: 
       borderRadius: 7,
       cursor: props.disabled ? 'default' : 'pointer',
       opacity: props.disabled ? 0.45 : 1,
-      backgroundColor: active ? C.panel : hovered ? C.panelRaised : undefined,
-      borderWidth: focused ? 1 : 0,
-      borderColor: C.primary,
+      backgroundColor: active ? C.panel : 'transparent',
+      borderWidth: 1,
+      borderColor: 'transparent',
     }, props.style)}
   >
-    <text style={{ fontFamily: 'Helvetica', fontSize: 12, fontWeight: active ? 700 : 500, color: active ? C.text : C.muted }}>{props.children}</text>
+    <text style={{ fontFamily: 'Helvetica', fontSize: 12, fontWeight: 600, color: active ? C.text : C.muted }}>{props.children}</text>
   </div>
 }
 
@@ -559,7 +555,7 @@ function ScrollAreaViewport(props: { children: ReactNode; style?: Style; testId?
     testId={props.testId}
     onScroll={measure}
     onMouseEnter={measure}
-    style={mergeStyle({ flexGrow: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column' }, props.style)}
+    style={mergeStyle({ flexGrow: 1, minHeight: 0, overflowY: 'scroll', pointerEvents: 'auto', display: 'flex', flexDirection: 'column' }, props.style)}
   >{props.children}</div>
 }
 
@@ -780,16 +776,32 @@ function ToastPortal(props: { children: ReactNode }) {
 
 function ToastViewport(props: { children?: ReactNode; style?: Style; testId?: string }) {
   const toasts = useToastList()
+  const { width, height } = useWindowSize()
   const expanded = toasts.length > 0
   const ariaProps = { 'aria-live': 'polite' as const, 'aria-atomic': false }
-  return <div
-    {...ariaProps}
-    role="region"
-    aria-label="Notifications"
-    testId={props.testId}
-    data-expanded={expanded}
-    style={mergeStyle({ position: 'absolute', right: 22, bottom: 22, width: 330, display: 'flex', flexDirection: 'column', gap: 8 }, props.style)}
-  >{props.children}</div>
+  const dataProps = { 'data-expanded': expanded }
+  return <anchored position={{ x: 0, y: 0 }} priority={5} style={{ pointerEvents: 'none' }}>
+    <div
+      {...ariaProps}
+      {...dataProps}
+      role="region"
+      aria-label="Notifications"
+      testId={props.testId}
+      style={mergeStyle({
+        width,
+        height,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        justifyContent: 'flex-end',
+        paddingRight: 22,
+        paddingBottom: 22,
+        gap: 8,
+      }, props.style)}
+    >
+      <div style={{ width: 330, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'auto' }}>{props.children}</div>
+    </div>
+  </anchored>
 }
 
 const ToastItemContext = createContext<{ toast: ToastObject; close: () => void } | null>(null)
@@ -844,7 +856,7 @@ function ToastAction(props: { children: ReactNode; onClick?: () => void; style?:
   const item = useContext(ToastItemContext)
   const { pressProps, hovered } = usePress({ onPress: () => { props.onClick?.(); item?.close() } })
   const { tokens: C } = useTheme()
-  return <div {...pressProps} testId={props.testId} style={mergeStyle({ alignSelf: 'flex-start', minHeight: 28, display: 'flex', alignItems: 'center', paddingLeft: 10, paddingRight: 10, borderRadius: 6, borderWidth: 1, borderColor: C.borderStrong, backgroundColor: hovered ? C.panelRaised : C.control, cursor: 'pointer' }, props.style)}>
+  return <div {...pressProps} testId={props.testId} style={mergeStyle({ alignSelf: 'flex-start', minHeight: 28, display: 'flex', alignItems: 'center', paddingLeft: 10, paddingRight: 10, borderRadius: 6, borderWidth: 1, borderColor: C.borderStrong, backgroundColor: C.control, cursor: 'pointer' }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 12, fontWeight: 700, color: C.text }}>{props.children}</text>
   </div>
 }
@@ -853,7 +865,7 @@ function ToastClose(props: { children?: ReactNode; style?: Style; testId?: strin
   const { tokens: C } = useTheme()
   const item = useContext(ToastItemContext)
   const { pressProps, hovered } = usePress({ onPress: () => item?.close(), role: 'button' })
-  return <div {...pressProps} aria-label="Close" testId={props.testId} style={mergeStyle({ position: 'absolute', top: 8, right: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: hovered ? C.control : 'transparent', cursor: 'pointer' }, props.style)}>
+  return <div {...pressProps} aria-label="Close" testId={props.testId} style={mergeStyle({ position: 'absolute', top: 8, right: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: 'transparent', cursor: 'pointer' }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 14, color: C.muted }}>{props.children ?? '×'}</text>
   </div>
 }

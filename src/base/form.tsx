@@ -332,7 +332,7 @@ function FormSubmit(props: { children: ReactNode; style?: Style; testId?: string
   const form = useContext(FormContext)
   const { tokens: C } = useTheme()
   const { pressProps, hovered } = usePress({ onPress: () => form?.submit() })
-  return <div {...pressProps} testId={props.testId} style={mergeStyle({ alignSelf: 'flex-start', height: 36, display: 'flex', alignItems: 'center', paddingLeft: 14, paddingRight: 14, borderRadius: 8, borderWidth: 1, borderColor: C.primary, backgroundColor: hovered ? C.violet : C.primary, cursor: 'pointer' }, props.style)}>
+  return <div {...pressProps} testId={props.testId} style={mergeStyle({ alignSelf: 'flex-start', height: 36, display: 'flex', alignItems: 'center', paddingLeft: 14, paddingRight: 14, borderRadius: 8, borderWidth: 1, borderColor: C.primary, backgroundColor: C.primary, cursor: 'pointer' }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 13, fontWeight: 700, color: C.primaryForeground }}>{props.children}</text>
   </div>
 }
@@ -544,7 +544,7 @@ function StepperButton(props: { direction: 1 | -1; children: ReactNode; testId?:
     }}
     onMouseUp={stop}
     onMouseLeave={stop}
-    style={{ width: 32, alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? C.panelRaised : C.control, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1 }}
+    style={{ width: 32, alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: C.control, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1 }}
   >
     <text style={{ fontFamily: 'Helvetica', fontSize: 14, color: C.text }}>{props.children}</text>
   </div>
@@ -715,6 +715,7 @@ function OTPFieldInput(props: { index?: number; style?: Style; testId?: string; 
   useEffect(() => { context.registerCell(indexRef.current, ref) }, [context, indexRef])
   const index = indexRef.current
   const char = context.value[index] ?? ''
+  const wide = char ? /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/.test(char) : false
   return <input
     ref={ref as never}
     testId={props.testId}
@@ -732,22 +733,31 @@ function OTPFieldInput(props: { index?: number; style?: Style; testId?: string; 
     onKeyDown={(event: EventPayload) => {
       const key = (event.key ?? '').toLowerCase()
       if (key === 'backspace') {
+        if (char) {
+          context.setCellValue(index, '', event)
+          if (index > 0) context.focusCell(index - 1)
+        } else if (index > 0) {
+          context.setCellValue(index - 1, '', event)
+          context.focusCell(index - 1)
+        }
+      } else if (key === 'delete') {
         if (char) context.setCellValue(index, '', event)
-        else context.focusCell(index - 1)
+        else context.focusCell(index + 1)
       } else if (key === 'left') context.focusCell(index - 1)
       else if (key === 'right') context.focusCell(index + 1)
     }}
     style={mergeStyle({
-      width: 34,
-      height: 40,
-      textAlign: 'center',
-      borderRadius: 7,
+      width: 36,
+      height: 42,
+      paddingLeft: wide ? 9 : 12,
+      paddingRight: 0,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: C.borderStrong,
       backgroundColor: C.input,
       color: C.text,
-      fontFamily: 'Helvetica',
-      fontSize: 16,
+      fontFamily: 'Menlo',
+      fontSize: 15,
       opacity: context.disabled ? 0.5 : 1,
     }, props.style)}
   />
@@ -814,6 +824,7 @@ export function CheckboxRoot(props: {
   readOnly?: boolean
   required?: boolean
   name?: string
+  label?: ReactNode
   children?: ReactNode
   style?: Style
   testId?: string
@@ -849,31 +860,33 @@ export function CheckboxRoot(props: {
   }
   const { pressProps, hovered, focused } = usePress({ disabled, focusableWhenDisabled: true, role: 'checkbox', onPress: (event) => toggle(event) })
   const ariaProps = { 'aria-checked': state.indeterminate ? 'mixed' : state.checked }
-  return <div
-    {...pressProps}
-    {...ariaProps}
-    testId={props.testId}
-    aria-label={props.ariaLabel}
-    style={mergeStyle({
-      width: 19,
-      height: 19,
-      flexShrink: 0,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 5,
-      borderWidth: 1,
-      borderColor: focused ? C.primary : state.checked || state.indeterminate ? C.primary : C.borderStrong,
-      backgroundColor: state.checked || state.indeterminate ? C.primary : hovered ? C.panelRaised : C.input,
-      opacity: disabled ? 0.45 : 1,
-      cursor: disabled ? 'default' : 'pointer',
-    }, props.style)}
-  >
+  const boxStyle: Style = {
+    width: 19,
+    height: 19,
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: state.checked || state.indeterminate ? C.primary : C.borderStrong,
+    backgroundColor: state.checked || state.indeterminate ? C.primary : C.input,
+    opacity: disabled ? 0.45 : 1,
+    cursor: disabled ? 'default' : 'pointer',
+  }
+  const boxContent = <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
     {props.children ?? (state.indeterminate
       ? <text style={{ fontFamily: 'Helvetica', fontSize: 12, fontWeight: 800, color: C.primaryForeground }}>−</text>
       : state.checked
         ? <text style={{ fontFamily: 'Helvetica', fontSize: 13, fontWeight: 800, color: C.primaryForeground }}>✓</text>
         : null)}
+  </div>
+  if (props.label === undefined) {
+    return <div {...pressProps} {...ariaProps} testId={props.testId} aria-label={props.ariaLabel} style={mergeStyle(boxStyle, props.style)}>{boxContent}</div>
+  }
+  return <div {...pressProps} {...ariaProps} testId={props.testId} aria-label={props.ariaLabel} style={mergeStyle({ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, cursor: disabled ? 'default' : 'pointer' }, props.style)}>
+    <div style={{ ...boxStyle, pointerEvents: 'none' }}>{boxContent}</div>
+    <text style={{ fontFamily: 'Helvetica', fontSize: 13, color: C.text }}>{props.label}</text>
   </div>
 }
 
@@ -927,7 +940,7 @@ function RadioGroupRoot(props: {
   </RadioGroupContext.Provider>
 }
 
-function RadioRoot(props: { value: string | number; disabled?: boolean; children?: ReactNode; style?: Style; testId?: string; ariaLabel?: string }) {
+function RadioRoot(props: { value: string | number; disabled?: boolean; label?: ReactNode; children?: ReactNode; style?: Style; testId?: string; ariaLabel?: string }) {
   const { tokens: C } = useTheme()
   const group = useContext(RadioGroupContext)
   if (!group) throw new Error('Radio.Root must be used inside RadioGroup.Root')
@@ -951,28 +964,29 @@ function RadioRoot(props: { value: string | number; disabled?: boolean; children
     },
   })
   const ariaProps = { 'aria-checked': selected }
-  return <div
-    {...pressProps}
-    {...ariaProps}
-    ref={ref as never}
-    testId={props.testId}
-    aria-label={props.ariaLabel}
-    style={mergeStyle({
-      width: 18,
-      height: 18,
-      flexShrink: 0,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 9,
-      borderWidth: 1,
-      borderColor: focused ? C.primary : selected ? C.primary : C.borderStrong,
-      backgroundColor: hovered ? C.panelRaised : C.input,
-      opacity: disabled ? 0.45 : 1,
-      cursor: disabled ? 'default' : 'pointer',
-    }, props.style)}
-  >
+  const circleStyle: Style = {
+    width: 18,
+    height: 18,
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: C.borderStrong,
+    backgroundColor: selected ? C.selected : C.input,
+    opacity: disabled ? 0.45 : 1,
+    cursor: disabled ? 'default' : 'pointer',
+  }
+  const circleContent = <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
     {props.children ?? (selected ? <div style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.primary }} /> : null)}
+  </div>
+  if (props.label === undefined) {
+    return <div {...pressProps} {...ariaProps} ref={ref as never} testId={props.testId} aria-label={props.ariaLabel} style={mergeStyle(circleStyle, props.style)}>{circleContent}</div>
+  }
+  return <div {...pressProps} {...ariaProps} ref={ref as never} testId={props.testId} aria-label={props.ariaLabel} style={mergeStyle({ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, cursor: disabled ? 'default' : 'pointer' }, props.style)}>
+    <div style={{ ...circleStyle, pointerEvents: 'none' }}>{circleContent}</div>
+    <text style={{ fontFamily: 'Helvetica', fontSize: 13, color: C.text }}>{props.label}</text>
   </div>
 }
 
@@ -1016,33 +1030,29 @@ export function SwitchRoot(props: {
     onPress: (event) => setChecked(!checked, 'trigger-press', event),
   })
   const ariaProps = { 'aria-checked': checked }
+  const trackStyle: Style = {
+    width: 40,
+    height: 24,
+    flexShrink: 0,
+    padding: 3,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: checked ? C.primary : C.track,
+    cursor: disabled ? 'default' : 'pointer',
+    opacity: disabled ? 0.45 : 1,
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+  }
+  const track = <div style={props.label === undefined ? mergeStyle(trackStyle, props.style) : { ...trackStyle, pointerEvents: 'none' }}>{props.children ?? <SwitchThumb />}</div>
   return <SwitchContext.Provider value={{ checked }}>
-    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <div
-        {...pressProps}
-        {...ariaProps}
-        testId={props.testId}
-        aria-label={props.ariaLabel}
-        style={mergeStyle({
-          width: 40,
-          height: 24,
-          flexShrink: 0,
-          padding: 3,
-          borderRadius: 13,
-          borderWidth: focused ? 1 : 0,
-          borderColor: C.primary,
-          backgroundColor: checked ? C.primary : hovered ? C.panelRaised : C.track,
-          cursor: disabled ? 'default' : 'pointer',
-          opacity: disabled ? 0.45 : 1,
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-        }, props.style)}
-      >
-        {props.children ?? <SwitchThumb />}
-      </div>
-      {props.label ? <text style={{ fontFamily: 'Helvetica', fontSize: 13, color: C.text }}>{props.label}</text> : null}
-    </div>
+    {props.label === undefined
+      ? <div {...pressProps} {...ariaProps} testId={props.testId} aria-label={props.ariaLabel} style={mergeStyle(trackStyle, props.style)}>{props.children ?? <SwitchThumb />}</div>
+      : <div {...pressProps} {...ariaProps} testId={props.testId} aria-label={props.ariaLabel} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, cursor: disabled ? 'default' : 'pointer' }}>
+          {track}
+          <text style={{ fontFamily: 'Helvetica', fontSize: 13, color: C.text }}>{props.label}</text>
+        </div>}
   </SwitchContext.Provider>
 }
 
@@ -1050,7 +1060,7 @@ function SwitchThumb(props: { checked?: boolean }) {
   const { tokens: C } = useTheme()
   const context = useContext(SwitchContext)
   const checked = props.checked ?? context?.checked ?? false
-  return <div style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: C.primaryForeground, marginLeft: checked ? 16 : 0 }} />
+  return <div style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: C.primaryForeground, marginLeft: checked ? 16 : 0, pointerEvents: 'none' }} />
 }
 
 export const Switch = Object.assign(SwitchRoot, { Root: SwitchRoot, Thumb: SwitchThumb })
@@ -1149,14 +1159,20 @@ function SliderValue(props: { children?: ReactNode | ((formatted: string, value:
 
 function SliderControl(props: { children: ReactNode; style?: Style }) {
   const slider = useSlider('Slider.Control')
-  const { renderer } = useGpuix()
-  const getTrackBounds = useBounds(slider.trackRef)
+  return <div style={mergeStyle({ display: 'flex', flexDirection: 'row', alignItems: 'center', height: 24, cursor: slider.disabled ? 'default' : 'pointer', opacity: slider.disabled ? 0.5 : 1, userSelect: 'none' }, props.style)}>{props.children}</div>
+}
+
+function SliderTrack(props: { children?: ReactNode; style?: Style }) {
+  const { tokens: C } = useTheme()
+  const slider = useSlider('Slider.Track')
+  const vertical = slider.orientation === 'vertical'
+  const getBounds = useBounds(slider.trackRef)
   const valueFromEvent = (event: EventPayload) => {
-    const bounds = getTrackBounds()
+    const bounds = getBounds()
     if (!bounds) return null
-    const ratio = slider.orientation === 'horizontal'
-      ? ((event.x ?? 0) - bounds.x) / Math.max(1, bounds.width)
-      : 1 - ((event.y ?? 0) - bounds.y) / Math.max(1, bounds.height)
+    const ratio = vertical
+      ? 1 - ((event.y ?? 0) - bounds.y) / Math.max(1, bounds.height)
+      : ((event.x ?? 0) - bounds.x) / Math.max(1, bounds.width)
     return slider.min + clamp(ratio, 0, 1) * (slider.max - slider.min)
   }
   const nearestIndex = (value: number) => {
@@ -1169,22 +1185,13 @@ function SliderControl(props: { children: ReactNode; style?: Style }) {
     return best
   }
   return <div
+    ref={slider.trackRef as never}
     onMouseDown={(event: EventPayload) => {
       if (slider.disabled) return
       const value = valueFromEvent(event)
       if (value === null) return
       slider.setValueAt(nearestIndex(value), value, 'track-press', event)
     }}
-    style={mergeStyle({ display: 'flex', flexDirection: 'row', alignItems: 'center', height: 24, cursor: slider.disabled ? 'default' : 'pointer', opacity: slider.disabled ? 0.5 : 1, userSelect: 'none' }, props.style)}
-  >{props.children}</div>
-}
-
-function SliderTrack(props: { children?: ReactNode; style?: Style }) {
-  const { tokens: C } = useTheme()
-  const slider = useSlider('Slider.Track')
-  const vertical = slider.orientation === 'vertical'
-  return <div
-    ref={slider.trackRef as never}
     style={mergeStyle(vertical
       ? { position: 'relative', width: 6, height: 160, borderRadius: 3, backgroundColor: C.track, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }
       : { position: 'relative', flexGrow: 1, height: 6, borderRadius: 3, backgroundColor: C.track, display: 'flex', flexDirection: 'row' }, props.style)}
@@ -1200,8 +1207,8 @@ function SliderIndicator(props: { style?: Style }) {
   const vertical = slider.orientation === 'vertical'
   const size = Math.round(ratio * ((vertical ? getBounds()?.height : getBounds()?.width) ?? 0))
   return <div style={mergeStyle(vertical
-    ? { position: 'absolute', left: 0, right: 0, bottom: 0, height: size, borderRadius: 3, backgroundColor: C.violet }
-    : { position: 'absolute', top: 0, bottom: 0, left: 0, width: size, borderRadius: 3, backgroundColor: C.violet }, props.style)} />
+    ? { position: 'absolute', left: 0, right: 0, bottom: 0, height: size, borderRadius: 3, backgroundColor: C.violet, pointerEvents: 'none' }
+    : { position: 'absolute', top: 0, bottom: 0, left: 0, width: size, borderRadius: 3, backgroundColor: C.violet, pointerEvents: 'none' }, props.style)} />
 }
 
 function SliderThumb(props: { index?: number; style?: Style; testId?: string; ariaLabel?: string }) {

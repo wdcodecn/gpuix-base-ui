@@ -69,15 +69,15 @@ export function Toggle(props: {
       paddingLeft: 12,
       paddingRight: 12,
       borderRadius: 7,
-      borderWidth: focused ? 1 : 0,
-      borderColor: C.primary,
-      backgroundColor: pressed ? C.selected : hovered ? C.panelRaised : C.control,
+      borderWidth: 1,
+      borderColor: 'transparent',
+      backgroundColor: pressed ? C.selected : 'transparent',
       cursor: disabled ? 'default' : 'pointer',
       opacity: disabled ? 0.45 : 1,
       userSelect: 'none',
     }, props.style)}
   >
-    <text style={{ fontFamily: 'Helvetica', fontSize: 13, fontWeight: pressed ? 700 : 500, color: pressed ? C.selectedForeground : C.text }}>{props.children}</text>
+    <text style={{ fontFamily: 'Helvetica', fontSize: 13, fontWeight: 600, color: pressed ? C.selectedForeground : C.muted }}>{props.children}</text>
   </div>
 }
 
@@ -195,7 +195,7 @@ function ToolbarLink(props: { children: ReactNode; onClick?: () => void; disable
   const toolbar = useContext(ToolbarContext)
   const { ref, onKeyDown } = useToolbarItem(!props.disabled)
   const { pressProps, hovered, focused } = usePress({ disabled: props.disabled ?? toolbar?.disabled, onPress: props.onClick, onKeyDown })
-  return <div {...pressProps} ref={ref as never} testId={props.testId} style={mergeStyle({ minHeight: 34, display: 'flex', alignItems: 'center', paddingLeft: 8, paddingRight: 8, borderRadius: 7, cursor: 'pointer', backgroundColor: hovered ? C.control : undefined }, props.style)}>
+  return <div {...pressProps} ref={ref as never} testId={props.testId} style={mergeStyle({ minHeight: 34, display: 'flex', alignItems: 'center', paddingLeft: 8, paddingRight: 8, borderRadius: 7, cursor: 'pointer', backgroundColor: undefined }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 13, color: C.text, textDecoration: focused ? 'underline' : 'none' }}>{props.children}</text>
   </div>
 }

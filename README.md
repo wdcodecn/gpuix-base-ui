@@ -79,8 +79,31 @@ bun run dev
 渲染,Hermes 运行 JavaScript,不含 WebView。构建与安装见
 [android/README.md](android/README.md)。
 
+要把一个已有的 GPUIX React 项目接入同一个原生宿主,安装本包后在目标项目根目录执行:
+
+```sh
+bunx gpuix-android init --entry src/main.tsx --app-id com.example.myapp --name "My App"
+bunx gpuix-android build
+bunx gpuix-android install ADB_SERIAL
+```
+
+`init` 复制 `android/` 的宿主源码,但不会复制构建缓存、下载依赖或生成的 `.so`,并且
+拒绝覆盖已有的 `android/`。项目根目录的 `gpuix.android.json` 是唯一需要维护的配置:
+
+```json
+{
+  "entrypoint": "src/main.tsx",
+  "appId": "com.example.myapp",
+  "appName": "My App"
+}
+```
+
+CLI 的 `build` 与 `install` 只是调用目标项目已复制的脚本;应用仍由 GPUI/wgpu 绘制,
+并由独立 Hermes 执行 JavaScript,不会退回到 WebView 或 React Native View。
+
 ## 发布
 
-仓库以源码分发:`files` 只包含 `src`、`README.md` 与 `LICENSE`;`exports`
-提供根入口、`./merge-props`、`./use-render` 以及每个组件的子路径入口。
-本地 `dist/` 与 `screenshots/` 只是开发产物,不进入发布内容。
+仓库以源码分发:`files` 包含组件源码、README、许可证以及可复制的 `android/`
+原生宿主和 `gpuix-android` CLI;`exports` 提供根入口、`./merge-props`、
+`./use-render` 以及每个组件的子路径入口。本地 `dist/`、Android 构建缓存、下载
+依赖与生成的原生库不会进入发布内容。

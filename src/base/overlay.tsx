@@ -6,10 +6,14 @@ import type { EventPayload } from '@gpuix/native'
 import type { PublicInstance as Instance } from '@gpuix/react'
 import { useTheme } from '../theme-context'
 import {
+  cloneElement, isValidElement, type ReactElement } from 'react'
+import {
   isActivationKey, keyName, mergeStyle, useControllableState, useDismiss, usePress, useReturnFocus, useRovingFocus,
   type ChangeDetails, type OpenReason, type Style,
 } from './foundations'
 import { menuItemStyle, popupListStyle, useItemCollection, useItemRegistration, useListNavigation } from './surface'
+import { Chevron } from './chevron'
+import { mergeProps } from '../merge-props'
 
 type OverlayContextValue = {
   open: boolean
@@ -100,8 +104,8 @@ function TriggerSurface(props: {
       paddingRight: 12,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: focused || props.active ? C.primary : C.borderStrong,
-      backgroundColor: props.active ? C.selected : hovered ? C.panelRaised : C.control,
+      borderColor: C.borderStrong,
+      backgroundColor: props.active ? C.selected : C.control,
       cursor: props.disabled ? 'default' : 'pointer',
       opacity: props.disabled ? 0.5 : 1,
       userSelect: 'none',
@@ -135,7 +139,7 @@ function DialogTrigger(props: { children: ReactNode; style?: Style; testId?: str
     active={dialog.open}
     style={props.style}
     onPress={() => dialog.setOpen(true, 'trigger-press')}
-  >{props.children}<text style={{ fontSize: 12 }}>▾</text></TriggerSurface>
+  ><Chevron open={dialog.open} size={11} /></TriggerSurface>
 }
 
 function DialogPortal(props: { children: ReactNode }) { return <>{props.children}</> }
@@ -216,7 +220,7 @@ function DialogClose(props: { children?: ReactNode; style?: Style; testId?: stri
   const dialog = useOverlay('Dialog.Close')
   const { tokens: C } = useTheme()
   const { pressProps, hovered } = usePress({ onPress: () => dialog.setOpen(false, 'close-press'), disabled: dialog.disabled })
-  return <div {...pressProps} testId={props.testId} style={mergeStyle({ alignSelf: 'flex-start', minHeight: 32, display: 'flex', alignItems: 'center', paddingLeft: 12, paddingRight: 12, borderRadius: 8, borderWidth: 1, borderColor: C.borderStrong, backgroundColor: hovered ? C.panelRaised : C.control, cursor: 'pointer' }, props.style)}>
+  return <div {...pressProps} testId={props.testId} style={mergeStyle({ alignSelf: 'flex-start', minHeight: 32, display: 'flex', alignItems: 'center', paddingLeft: 12, paddingRight: 12, borderRadius: 8, borderWidth: 1, borderColor: C.borderStrong, backgroundColor: C.control, cursor: 'pointer' }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 12, fontWeight: 700, color: C.text }}>{props.children ?? '关闭'}</text>
   </div>
 }
@@ -345,7 +349,7 @@ function DrawerSwipeArea(props: { children?: ReactNode; style?: Style; disabled?
     }}
     style={mergeStyle({ display: 'flex', justifyContent: 'center', paddingTop: 4, paddingBottom: 8, marginTop: horizontal ? 0 : offset, marginLeft: horizontal ? offset : 0, cursor: horizontal ? 'ew-resize' : 'ns-resize' }, props.style)}
   >
-    <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderStrong }} />
+    <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderStrong, pointerEvents: 'none' }} />
     {props.children}
   </div>
 }
@@ -736,7 +740,7 @@ function MenuTrigger(props: { children: ReactNode; style?: Style; testId?: strin
       if (timer.current) clearTimeout(timer.current)
       timer.current = setTimeout(() => menu.setOpen(false, 'trigger-hover'), props.closeDelay ?? 0)
     }}
-  >{props.children}<text style={{ fontSize: 12 }}>▾</text></TriggerSurface>
+  ><Chevron open={menu.open} size={11} /></TriggerSurface>
 }
 
 function MenuSeparator() {
@@ -1054,20 +1058,22 @@ const ContextMenuContext = createContext<{
 function ContextMenuTrigger(props: { children: ReactNode; style?: Style; testId?: string }) {
   const value = useContext(ContextMenuContext)
   if (!value) throw new Error('ContextMenu.Trigger must be used inside ContextMenu.Root')
-  return <div
-    testId={props.testId}
-    onMouseDown={(event: EventPayload) => {
-      if (event.button !== 2 && !event.isRightClick) return
-      value.setPosition({ x: event.x ?? 0, y: event.y ?? 0 })
-      value.context.setOpen(true, 'trigger-press', event)
-    }}
-    onAuxClick={(event: EventPayload) => {
-      if (!event.isRightClick && event.button !== 2) return
-      value.setPosition({ x: event.x ?? 0, y: event.y ?? 0 })
-      value.context.setOpen(true, 'trigger-press', event)
-    }}
-    style={mergeStyle({ display: 'flex', flexDirection: 'column' }, props.style)}
-  >{props.children}</div>
+  const onContext = (event: EventPayload) => {
+    if (event.button !== 2 && !event.isRightClick) return
+    value.setPosition({ x: event.x ?? 0, y: event.y ?? 0 })
+    value.context.setOpen(true, 'trigger-press', event)
+  }
+  const handlers = {
+    testId: props.testId,
+    onMouseDown: onContext,
+    onAuxClick: onContext,
+    style: mergeStyle({ display: 'flex', flexDirection: 'column' }, props.style),
+  }
+  const child = props.children as ReactElement | undefined
+  if (isValidElement(child) && isValidElement(child)) {
+    return cloneElement(child, mergeProps(child.props as Record<string, unknown>, handlers as Record<string, unknown>) as never)
+  }
+  return <div {...(handlers as Record<string, unknown>)}>{props.children}</div>
 }
 
 function ContextMenuPopup(props: { children: ReactNode; style?: Style; testId?: string }) {

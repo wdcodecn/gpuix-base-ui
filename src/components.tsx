@@ -11,7 +11,7 @@ export function Glyph({ children, color, size = 20 }: { children: string; color?
 export function IconButton({ children, onClick, label, testId, variant = 'ghost' }: { children: string; onClick?: () => void; label: string; testId?: string; variant?: 'primary' | 'secondary' | 'ghost' | 'destructive' }) {
   const { tokens: C } = useTheme()
   const background = variant === 'primary' ? C.primary : variant === 'destructive' ? C.red : variant === 'secondary' ? C.control : 'transparent'
-  return <div testId={testId} role="button" aria-label={label} onClick={onClick} style={{ width: 34, height: 34, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: variant === 'ghost' ? 0 : 1, borderColor: C.borderStrong, backgroundColor: background, cursor: 'pointer', hover: { backgroundColor: variant === 'primary' ? C.violet : C.panelRaised } }}><Glyph color={variant === 'primary' || variant === 'destructive' ? C.primaryForeground : C.text} size={18}>{children}</Glyph></div>
+  return <div testId={testId} role="button" aria-label={label} onClick={onClick} style={{ width: 34, height: 34, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: variant === 'ghost' ? 'transparent' : C.borderStrong, backgroundColor: background, cursor: 'pointer', hover: { backgroundColor: variant === 'primary' ? C.violet : C.panelRaised } }}><Glyph color={variant === 'primary' || variant === 'destructive' ? C.primaryForeground : C.text} size={18}>{children}</Glyph></div>
 }
 
 export function Badge({ children, tone = 'neutral', width }: { children: ReactNode; tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'; width?: number | string }) {

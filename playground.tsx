@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { render, useWindowInsets, useWindowSize } from '@gpuix/react'
 import { Badge, Button, Card, Glyph, IconButton, Input, List, Select, Switch, Tabs, ThemeProvider, useTheme, type ThemeMode } from './src'
 import { Gallery } from './gallery'
@@ -67,7 +67,7 @@ function Shell() {
     <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', padding: 8, gap: 4, backgroundColor: C.panel, borderBottomWidth: 1, borderColor: C.border }}>
       {[NAV.slice(0, 4), NAV.slice(4)].map((items, row) => <div key={row} style={{ display: 'flex', flexDirection: 'row', gap: 4 }}>{items.map((item) => <Button key={item.id} testId={`nav-${item.label}`} variant={page === item.id ? 'primary' : 'ghost'} style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, height: 42, paddingLeft: 4, paddingRight: 4 }} onClick={() => setPage(item.id)}>{item.label}</Button>)}</div>)}
     </div>
-    <div style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: page === 'proxies' ? 'hidden' : 'auto', padding: 10 }}>
+    <div style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: page === 'proxies' ? 'hidden' : 'scroll', flexBasis: 0, padding: 10 }}>
       <PageContent page={page} onNavigate={setPage} />
     </div>
   </div>
@@ -91,7 +91,7 @@ function Shell() {
         <text style={{ fontSize: 21, fontWeight: 800, color: C.text }}>{TITLES[page]}</text><div style={{ flexGrow: 1 }} />
         <Badge tone="info">GPUIX native</Badge><IconButton label="帮助">?</IconButton><IconButton label="更多">•••</IconButton>
       </div>
-      <div style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 22 }}>
+      <div style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'scroll', flexBasis: 0, padding: 22 }}>
         <PageContent page={page} onNavigate={setPage} />
       </div>
     </div>
@@ -138,44 +138,70 @@ function ProxiesLegacy() {
   return <List.Root style={{ height: '100%' }}><List.Header title="GPUIX · 代理节点" description="GPUIX virtual-list · 只挂载当前窗口，滚动时由原生列表接管" count={`${filteredRows.length.toLocaleString()} 个节点`} action={<div style={{ display: 'flex', flexDirection: 'row', gap: 7 }}><Badge tone="success">96 在线</Badge><Button size="sm" variant="secondary">批量测速</Button></div>} /><List.Toolbar><div style={{ width: 260 }}><Input value={query} placeholder="搜索节点或协议" onChange={(value) => { setQuery(value); setWindowStart(0) }} testId="proxy-search" /></div><Badge tone="info">窗口 {filteredRows.length === 0 ? 0 : windowStart + 1}–{end}</Badge><text style={{ fontSize: 11, color: C.muted }}>100 行窗口 · 原生滚轮惯性</text><div style={{ flexGrow: 1 }} /><Button size="sm" variant="ghost">规则</Button><Button size="sm" variant="ghost">全局</Button><Button size="sm" variant="ghost">直连</Button></List.Toolbar>{filteredRows.length === 0 ? <List.Empty title="没有匹配的节点" description="换一个关键词再试试" /> : <virtual-list itemCount={filteredRows.length} windowStart={windowStart} estimatedItemHeight={68} overdraw={360} style={{ flexGrow: 1, minHeight: 0 }} onVisibleRange={onVisibleRange}>{filteredRows.slice(windowStart, end).map((node) => <List.Item key={node.id} testId={`proxy-${node.id}`} selected={selected === node.id} onClick={() => setSelected(node.id)}><List.ItemLeading tone={node.latency < 150 ? 'success' : node.latency < 260 ? 'info' : 'warning'}>{node.flag}</List.ItemLeading><List.ItemContent><List.ItemTitle>{node.name}</List.ItemTitle><List.ItemDescription>{node.protocol} · UDP · {node.location} · TLS ready</List.ItemDescription></List.ItemContent><List.ItemMeta><text style={{ fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', color: node.latency < 150 ? C.green : node.latency < 260 ? C.violet : C.orange }}>{node.latency} ms</text><Badge tone={selected === node.id ? 'info' : 'neutral'}>{selected === node.id ? '当前节点' : '可用'}</Badge></List.ItemMeta><List.ItemActions><Button size="sm" variant={selected === node.id ? 'primary' : 'secondary'} onClick={() => setSelected(node.id)}>{selected === node.id ? '已选择' : '选择'}</Button><Button size="sm" variant="ghost">•••</Button></List.ItemActions></List.Item>)}</virtual-list>}</List.Root>
 }
 
-function ProxyRow({ node, selected, onSelect, mobile = false }: { node: typeof PROXY_ROWS[number]; selected: boolean; onSelect: () => void; mobile?: boolean }) {
+const ProxyRow = memo(function ProxyRow({ node, selected, onSelect, mobile = false }: { node: typeof PROXY_ROWS[number]; selected: boolean; onSelect: (id: string) => void; mobile?: boolean }) {
   const { tokens: C } = useTheme()
   const color = node.latency < 150 ? C.green : node.latency < 260 ? C.violet : C.orange
-  if (mobile) return <List.Item testId={`proxy-${node.id}`} selected={selected} onClick={onSelect} style={{ height: 104, minHeight: 104, maxHeight: 104, flexDirection: 'column', alignItems: 'stretch', gap: 4, paddingTop: 8, paddingBottom: 8 }}>
+  if (mobile) return <List.Item testId={`proxy-${node.id}`} selected={selected} onClick={() => onSelect(node.id)} style={{ height: 104, minHeight: 104, maxHeight: 104, flexDirection: 'column', alignItems: 'stretch', gap: 4, paddingTop: 8, paddingBottom: 8 }}>
     <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
       <List.ItemLeading tone={node.latency < 150 ? 'success' : 'info'}>{node.flag}</List.ItemLeading>
       <List.ItemContent><List.ItemTitle>{node.name}</List.ItemTitle><List.ItemDescription>{node.protocol} · UDP</List.ItemDescription></List.ItemContent>
-      <Button testId={`choose-${node.id}`} width={66} size="sm" variant={selected ? 'primary' : 'secondary'} style={{ flexShrink: 0, height: 42, paddingLeft: 4, paddingRight: 4 }} onClick={onSelect}>{selected ? '已选择' : '选择'}</Button>
+      <Button testId={`choose-${node.id}`} width={66} size="sm" variant={selected ? 'primary' : 'secondary'} style={{ flexShrink: 0, height: 42, paddingLeft: 4, paddingRight: 4 }} onClick={() => onSelect(node.id)}>{selected ? '已选择' : '选择'}</Button>
     </div>
     <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
       <List.ItemMeta><text style={{ width: 92, fontSize: 14, fontWeight: 700, textAlign: 'center', color }}>{node.latency} ms</text><Badge width={62} tone={selected ? 'info' : 'neutral'}>{selected ? '当前节点' : '可用'}</Badge></List.ItemMeta>
     </div>
   </List.Item>
-  return <List.Item testId={`proxy-${node.id}`} selected={selected} onClick={onSelect}>
+  return <List.Item testId={`proxy-${node.id}`} selected={selected} onClick={() => onSelect(node.id)}>
     <List.ItemLeading tone={node.latency < 150 ? 'success' : node.latency < 260 ? 'info' : 'warning'}>{node.flag}</List.ItemLeading>
     <List.ItemContent><List.ItemTitle>{node.name}</List.ItemTitle><List.ItemDescription>{node.protocol} · UDP · {node.location} · TLS ready</List.ItemDescription></List.ItemContent>
     <List.ItemMeta><div style={{ width: 92, display: 'flex', flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 2 }}><text style={{ fontSize: 14, fontWeight: 800, color, whiteSpace: 'nowrap' }}>{node.latency}</text><text style={{ fontSize: 11, color, whiteSpace: 'nowrap' }}>ms</text></div><Badge width={62} tone={selected ? 'info' : 'neutral'}>{selected ? '当前节点' : '可用'}</Badge></List.ItemMeta>
-    <List.ItemActions><Button width={58} size="sm" variant={selected ? 'primary' : 'secondary'} onClick={onSelect}>{selected ? '已选择' : '选择'}</Button><Button width={34} size="sm" variant="ghost">•••</Button></List.ItemActions>
+    <List.ItemActions><Button width={58} size="sm" variant={selected ? 'primary' : 'secondary'} onClick={() => onSelect(node.id)}>{selected ? '已选择' : '选择'}</Button><Button width={34} size="sm" variant="ghost">•••</Button></List.ItemActions>
   </List.Item>
-}
+})
 
 function Proxies() {
   const mobile = useWindowSize().width < 760
   const [selected, setSelected] = useState(PROXY_ROWS[1].id)
   const [query, setQuery] = useState('')
   const [windowStart, setWindowStart] = useState(0)
-  const filteredRows = query ? PROXY_ROWS.filter((row) => row.name.toLowerCase().includes(query.toLowerCase()) || row.protocol.toLowerCase().includes(query.toLowerCase())) : PROXY_ROWS
+  const windowStartRef = useRef(0)
+  const filteredRows = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return needle ? PROXY_ROWS.filter((row) => row.name.toLowerCase().includes(needle) || row.protocol.toLowerCase().includes(needle)) : PROXY_ROWS
+  }, [query])
   const windowSize = 100
   const maxStart = Math.max(0, filteredRows.length - windowSize)
   const end = Math.min(filteredRows.length, windowStart + windowSize)
-  const onVisibleRange = (event: { startIndex?: number }) => {
-    const next = Math.max(0, Math.min(maxStart, Math.floor((event.startIndex ?? 0) - 25)))
-    if (next !== windowStart) setWindowStart(next)
-  }
+  const selectNode = useCallback((id: string) => setSelected(id), [])
+  const resetWindow = useCallback(() => {
+    windowStartRef.current = 0
+    setWindowStart(0)
+  }, [])
+  // The native list reports its visible range continuously during inertia.
+  // Re-slicing 100 React rows for every crossed item floods the renderer and
+  // defeats virtualisation. Keep a 24-row safety band, advance a normal
+  // re-window by 8 rows, and only re-center after a real fast jump.
+  const onVisibleRange = useCallback((event: { startIndex?: number; endIndex?: number }) => {
+    const start = Math.max(0, Math.floor(event.startIndex ?? 0))
+    const endIndex = Math.max(start + 1, Math.ceil(event.endIndex ?? start + 1))
+    const current = windowStartRef.current
+    const currentEnd = Math.min(filteredRows.length, current + windowSize)
+    const safelyBuffered = start >= current + 24 && endIndex <= currentEnd - 24
+    if (safelyBuffered) return
+    const jumpedOutsideWindow = start < current || endIndex > currentEnd
+    const next = jumpedOutsideWindow
+      ? Math.max(0, Math.min(maxStart, Math.floor(start - windowSize / 2)))
+      : start < current + 24
+        ? Math.max(0, current - 8)
+        : Math.min(maxStart, current + 8)
+    if (next === current) return
+    windowStartRef.current = next
+    setWindowStart(next)
+  }, [filteredRows.length, maxStart])
   return <List.Root style={{ height: '100%' }}>
     <List.Header title="GPUIX · 代理节点" description={mobile ? "选择当前使用的节点" : "GPUIX virtual-list · 只挂载当前窗口，滚动时由原生列表接管"} count={`${filteredRows.length.toLocaleString()} 个节点`} action={mobile ? undefined : <><Badge tone="success">96 在线</Badge><Button size="sm" variant="secondary">批量测速</Button></>} />
-    <List.Toolbar><div style={{ width: mobile ? undefined : 240, flexGrow: mobile ? 1 : undefined, minWidth: 0 }}><Input value={query} placeholder="搜索节点或协议" onChange={(value) => { setQuery(value); setWindowStart(0) }} testId="proxy-search" /></div><Badge width={88} tone="info">窗口 {filteredRows.length === 0 ? 0 : windowStart + 1}–{end}</Badge>{!mobile && <text style={{ fontSize: 11, color: '#A1A1AA', whiteSpace: 'nowrap' }}>100 行窗口 · 原生滚轮惯性</text>}{!mobile && <><div style={{ flexGrow: 1 }} /><Button size="sm" variant="ghost">规则</Button></>}</List.Toolbar>
-    {filteredRows.length === 0 ? <List.Empty title="没有匹配的节点" description="换一个关键词再试试" /> : <virtual-list itemCount={filteredRows.length} windowStart={windowStart} estimatedItemHeight={mobile ? 104 : 68} overdraw={360} style={{ flexGrow: 1, minHeight: 0 }} onVisibleRange={onVisibleRange}>{filteredRows.slice(windowStart, end).map((node) => <ProxyRow mobile={mobile} key={node.id} node={node} selected={selected === node.id} onSelect={() => setSelected(node.id)} />)}</virtual-list>}
+    <List.Toolbar><div style={{ width: mobile ? undefined : 240, flexGrow: mobile ? 1 : undefined, minWidth: 0 }}><Input value={query} placeholder="搜索节点或协议" onChange={(value) => { setQuery(value); resetWindow() }} testId="proxy-search" /></div><Badge width={88} tone="info">窗口 {filteredRows.length === 0 ? 0 : windowStart + 1}–{end}</Badge>{!mobile && <text style={{ fontSize: 11, color: '#A1A1AA', whiteSpace: 'nowrap' }}>100 行窗口 · 原生滚轮惯性</text>}{!mobile && <><div style={{ flexGrow: 1 }} /><Button size="sm" variant="ghost">规则</Button></>}</List.Toolbar>
+    {filteredRows.length === 0 ? <List.Empty title="没有匹配的节点" description="换一个关键词再试试" /> : <virtual-list itemCount={filteredRows.length} windowStart={windowStart} estimatedItemHeight={mobile ? 104 : 68} overdraw={360} style={{ flexGrow: 1, minHeight: 0 }} onVisibleRange={onVisibleRange}>{filteredRows.slice(windowStart, end).map((node) => <ProxyRow mobile={mobile} key={node.id} node={node} selected={selected === node.id} onSelect={selectNode} />)}</virtual-list>}
   </List.Root>
 }
 

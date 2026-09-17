@@ -189,6 +189,7 @@ export function popupListStyle(C: ThemeTokens): Style {
     gap: 3,
     minWidth: 200,
     maxHeight: 340,
-    overflow: 'auto',
+    overflowY: 'scroll',
+    pointerEvents: 'auto',
   }
 }

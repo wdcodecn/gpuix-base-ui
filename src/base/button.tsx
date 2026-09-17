@@ -43,12 +43,12 @@ export function useButtonStyle(options: {
   const isDestructive = variant === 'destructive'
   const height = size === 'sm' ? 30 : size === 'lg' ? 42 : 36
   const background = isPrimary
-    ? pressed || hovered ? C.violet : C.primary
+    ? C.primary
     : isDestructive
-      ? hovered ? C.red : C.red
+      ? C.red
       : variant === 'ghost'
-        ? hovered || pressed ? C.control : 'transparent'
-        : hovered || pressed ? C.panelRaised : C.control
+        ? 'transparent'
+        : C.control
   return {
     height,
     minWidth: size === 'sm' ? 30 : undefined,
@@ -60,8 +60,8 @@ export function useButtonStyle(options: {
     paddingLeft: size === 'sm' ? 10 : 14,
     paddingRight: size === 'sm' ? 10 : 14,
     borderRadius: 8,
-    borderWidth: variant === 'ghost' ? (focused ? 1 : 0) : 1,
-    borderColor: focused ? C.primary : isPrimary ? C.primary : isDestructive ? C.red : C.borderStrong,
+    borderWidth: 1,
+    borderColor: variant === 'ghost' ? 'transparent' : isPrimary ? C.primary : isDestructive ? C.red : C.borderStrong,
     backgroundColor: background,
     opacity: disabled ? 0.45 : 1,
     cursor: disabled ? 'default' : 'pointer',
@@ -122,7 +122,7 @@ export function IconButton(props: { icon: string; label: string; onClick?: () =>
   const { tokens: C } = useTheme()
   const variant = props.variant ?? 'ghost'
   const { pressProps, hovered } = usePress({ disabled: props.disabled, onPress: props.onClick, role: 'button' })
-  const background = variant === 'primary' ? C.primary : variant === 'destructive' ? C.red : variant === 'secondary' ? C.control : hovered ? C.control : 'transparent'
+  const background = variant === 'primary' ? C.primary : variant === 'destructive' ? C.red : variant === 'secondary' ? C.control : 'transparent'
   return <div {...pressProps} testId={props.testId} aria-label={props.label} style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: variant === 'ghost' ? 0 : 1, borderColor: C.borderStrong, backgroundColor: background, cursor: props.disabled ? 'default' : 'pointer', opacity: props.disabled ? 0.45 : 1 }}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 17, textAlign: 'center', color: variant === 'primary' || variant === 'destructive' ? C.primaryForeground : C.text }}>{props.icon}</text>
   </div>

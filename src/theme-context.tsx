@@ -31,19 +31,19 @@ export type ThemeTokens = {
 // The palette follows the neutral/accent split used by shadcn, but is kept as
 // GPUI-friendly string tokens so an app can replace the whole visual system.
 const DARK: ThemeTokens = {
-  canvas: '#09090B', sidebar: '#111113', panel: '#18181B', panelRaised: '#27272A',
-  control: '#202023', input: '#111113', row: '#1D1D20', border: '#27272A', borderStrong: '#3F3F46',
-  text: '#FAFAFA', muted: '#A1A1AA', faint: '#71717A', primary: '#7C3AED', primaryForeground: '#FFFFFF',
-  selected: '#312E81', selectedForeground: '#EDE9FE', green: '#22C55E', orange: '#F59E0B',
-  red: '#EF4444', violet: '#A78BFA', track: '#3F3F46', iconBg: '#312E81', shadow: '#00000066',
+  canvas: '#09090B', sidebar: '#101012', panel: '#18181B', panelRaised: '#202023',
+  control: '#27272A', input: '#0F0F11', row: '#1C1C1F', border: '#27272A', borderStrong: '#3F3F46',
+  text: '#FAFAFA', muted: '#A1A1AA', faint: '#71717A', primary: '#FAFAFA', primaryForeground: '#18181B',
+  selected: '#27272A', selectedForeground: '#FAFAFA', green: '#22C55E', orange: '#F59E0B',
+  red: '#EF4444', violet: '#3B82F6', track: '#3F3F46', iconBg: '#27272A', shadow: '#00000066',
 }
 
 const LIGHT: ThemeTokens = {
   canvas: '#FAFAFA', sidebar: '#F4F4F5', panel: '#FFFFFF', panelRaised: '#F4F4F5',
   control: '#F4F4F5', input: '#FFFFFF', row: '#FAFAFA', border: '#E4E4E7', borderStrong: '#D4D4D8',
-  text: '#18181B', muted: '#71717A', faint: '#A1A1AA', primary: '#7C3AED', primaryForeground: '#FFFFFF',
-  selected: '#EDE9FE', selectedForeground: '#5B21B6', green: '#16A34A', orange: '#D97706',
-  red: '#DC2626', violet: '#7C3AED', track: '#D4D4D8', iconBg: '#EDE9FE', shadow: '#18181B22',
+  text: '#18181B', muted: '#71717A', faint: '#A1A1AA', primary: '#18181B', primaryForeground: '#FAFAFA',
+  selected: '#E4E4E7', selectedForeground: '#18181B', green: '#16A34A', orange: '#D97706',
+  red: '#DC2626', violet: '#2563EB', track: '#E4E4E7', iconBg: '#E4E4E7', shadow: '#18181B22',
 }
 
 type ThemeContextValue = {
