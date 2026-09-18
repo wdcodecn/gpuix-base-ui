@@ -8,30 +8,11 @@
   "files": [
     "src",
     "README.md",
-    "LICENSE",
-    "scripts/gpuix-android.ts",
-    "android/README.md",
-    "android/app/build.gradle.kts",
-    "android/app/src/main/AndroidManifest.xml",
-    "android/app/src/main/java",
-    "android/app/src/main/res",
-    "android/build.gradle.kts",
-    "android/gradle.properties",
-    "android/gradle",
-    "android/gradlew",
-    "android/hermes",
-    "android/rust/Cargo.lock",
-    "android/rust/Cargo.toml",
-    "android/rust/build.rs",
-    "android/rust/src",
-    "android/scripts",
-    "android/settings.gradle.kts",
-    "android/vendor/gpui-mobile",
-    "android/vendor/gpuix-native"
+    "README.zh-CN.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "LICENSE"
   ],
-  "bin": {
-    "gpuix-android": "./scripts/gpuix-android.ts"
-  },
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -62,10 +43,7 @@
   "scripts": {
     "dev": "bun --hot playground.tsx",
     "build": "bun build --compile playground.tsx --outfile dist/gpuix-base-ui-playground",
-    "typecheck": "tsc --noEmit",
-    "android": "bun scripts/gpuix-android.ts",
-    "android:build": "bash android/scripts/build-android.sh",
-    "android:install": "bash android/scripts/install-android.sh"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@gpuix/native": "0.9.0",

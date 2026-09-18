@@ -13,11 +13,15 @@ export function Chevron(props: { open?: boolean; size?: number; color?: string; 
     pointerEvents: 'none',
   }, props.style)}>
     <text style={{
-      fontFamily: 'Helvetica',
-      fontSize: props.size ?? 11,
+      // Use ASCII fallback glyphs here instead of ▾/▴: the bundled Android
+      // Helvetica face does not contain those symbols and renders an empty
+      // box on several devices. Roboto + v/^ stays visible in every target.
+      fontFamily: 'Roboto',
+      fontSize: (props.size ?? 11) + 1,
+      fontWeight: 800,
       lineHeight: 16,
       textAlign: 'center',
       color: props.color ?? (props.open ? C.text : C.muted),
-    }}>{props.open ? '▴' : '▾'}</text>
+    }}>{props.open ? '^' : 'v'}</text>
   </div>
 }

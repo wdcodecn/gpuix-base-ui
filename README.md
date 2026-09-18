@@ -1,109 +1,99 @@
 # gpuix-base-ui
 
-`gpuix-base-ui` 是一套面向 React + GPUIX 0.9 的开源组件源码:按 Base UI
-(v1.8.0)公开的组件家族与 anatomy 完整移植,只组合 GPUIX 的原生节点和事件,
-不修改 `@gpuix/*` 的底层源码。
+[简体中文](README.zh-CN.md)
 
-## 组件家族
+Open-code, composable UI components for React on GPUIX 0.9. The library ports
+the public Base UI v1.8 component families and anatomy to GPUIX native nodes
+and events. It does not patch `@gpuix/*` internals.
 
-37 个组件家族与官方命名一致:
+## Components
+
+The package exposes 37 component families:
 
 `Accordion` · `AlertDialog` · `Autocomplete` · `Avatar` · `Button` · `Checkbox` ·
 `CheckboxGroup` · `Collapsible` · `Combobox` · `ContextMenu` · `Dialog` · `Drawer` ·
 `Field` · `Fieldset` · `Form` · `Input` · `Menu` · `Menubar` · `Meter` ·
-`NavigationMenu` · `NumberField` · `OTPField` · `Popover` · `PreviewCard` · `Progress` ·
-`RadioGroup` · `ScrollArea` · `Select` · `Separator` · `Slider` · `Switch` ·
-`Tabs` · `Toast` · `Toggle` · `ToggleGroup` · `Toolbar` · `Tooltip`。
+`NavigationMenu` · `NumberField` · `OTPField` · `Popover` · `PreviewCard` ·
+`Progress` · `RadioGroup` · `ScrollArea` · `Select` · `Separator` · `Slider` ·
+`Switch` · `Tabs` · `Toast` · `Toggle` · `ToggleGroup` · `Toolbar` · `Tooltip`.
 
-工具与 Provider:`mergeProps`、`mergePropsN`、`useRender`、`CSPProvider`、
-`DirectionProvider`、`useDirection`、`useToastManager`、`createToastManager`。
+Utilities and providers include `mergeProps`, `mergePropsN`, `useRender`,
+`CSPProvider`, `DirectionProvider`, `useDirection`, `useToastManager`, and
+`createToastManager`. The repository also includes application-level `List`,
+`Card`, `Badge`, `Glyph`, and `IconButton` compositions.
 
-`Radio` 与 `RadioGroup.Item` 等价,`Tabs.Trigger/Content` 是 `Tabs.Tab/Panel` 的
-别名;其余部件名与官方文档逐项对应。仓库另外提供 `List` 组合层
-(`List.Root/Header/Toolbar/Item/ItemLeading/ItemContent/ItemTitle/ItemDescription/ItemMeta/ItemActions/Section/Separator/Empty/Loading`)
-和 `Card`、`Badge`、`Glyph`、`IconButton` 等应用级预设。
+## Install
 
-## 目录结构
-
-```text
-src/base/foundations.tsx   可控状态、按压、键盘、hover/focus、拖拽、bounds、roving focus
-src/base/surface.tsx       浮层公共层(anchored popup、item collection、列表导航)
-src/base/button.tsx        Button 语义与主题预设
-src/base/controls.tsx      Toggle / ToggleGroup / Toolbar
-src/base/overlay.tsx       Dialog / AlertDialog / Drawer / Popover / PreviewCard / Tooltip / Menu / ContextMenu / Menubar
-src/base/chooser.tsx       Select / Autocomplete / Combobox / NavigationMenu
-src/base/form.tsx          Field / Fieldset / Form / Input / NumberField / OTPField / Checkbox / CheckboxGroup / RadioGroup / Switch / Slider
-src/base/display.tsx       Accordion / Collapsible / Avatar / Meter / Progress / ScrollArea / Separator / Tabs / Toast
-src/base/providers.tsx     DirectionProvider / CSPProvider
-src/base-components.tsx    聚合入口
-src/merge-props.ts         mergeProps 实现
-src/use-render.ts          useRender 实现
-src/<name>.ts              单组件子路径入口,与官方命名一一对应
+```sh
+bun add gpuix-base-ui @gpuix/react @gpuix/native react
 ```
 
-应用可以直接复制这些源码,替换 `ThemeTokens` 建立自己的视觉系统。
+```tsx
+import { render } from '@gpuix/react'
+import { Button, Card, ThemeProvider } from 'gpuix-base-ui'
 
-## GPUIX 0.9 映射边界
+function App() {
+  return <Card.Root>
+    <Card.Header title="GPUIX" description="Native UI components" />
+    <Card.Content>
+      <Button variant="primary">Continue</Button>
+    </Card.Content>
+  </Card.Root>
+}
 
-- 没有 DOM 与 Portal:`Portal` 部件为透传,Dialog/Drawer 使用窗口坐标层,
-  菜单、下拉与浮层使用 GPUIX 的 `<anchored>` 原生定位。
-- 原生样式不接受百分比尺寸与偏移:指示条、滑块 Thumb、滚动条 Thumb 的位置
-  通过 `renderer.getElementBounds()` 实测像素计算。
-- 无 CSS transition:弹层即时开合;需要动画时使用 GPUIX 的 `motion` 能力。
-- ARIA 为 GPUIX 子集:`role`、`aria-label`、`aria-description`、`aria-id`、
-  `aria-expanded`、`aria-selected`、`aria-valuetext`、`aria-level`。
-- 键盘事件需要元素焦点:交互部件自带 `tabIndex`,方向键、Enter、Space、
-  Escape、typeahead 均按 GPUIX 的 key payload 处理。
-- 焦点回归:浮层关闭后焦点返回 trigger;Dialog 打开时聚焦 Popup 容器。
+render(<ThemeProvider initialMode="system"><App /></ThemeProvider>)
+```
+
+## Source layout
+
+```text
+src/base/foundations.tsx   Controlled state, press, keyboard, focus and drag primitives
+src/base/surface.tsx       Shared anchored popup and collection behavior
+src/base/button.tsx        Button semantics and theme presets
+src/base/controls.tsx      Toggle, ToggleGroup and Toolbar
+src/base/overlay.tsx       Dialog, Drawer, Popover, Tooltip and menu families
+src/base/chooser.tsx       Select, Autocomplete, Combobox and NavigationMenu
+src/base/form.tsx          Fields, inputs, checkboxes, radios, switches and sliders
+src/base/display.tsx       Accordion, progress, scroll, tabs and toast families
+src/base/providers.tsx     DirectionProvider and CSPProvider
+src/<name>.ts              Per-component package entry points
+```
+
+Applications can import the components directly or copy their source and
+replace `ThemeTokens` with a product-specific visual system.
+
+## GPUIX mapping notes
+
+- GPUIX has no DOM portal. Overlay portal parts are transparent wrappers;
+  anchored content uses GPUIX native positioning.
+- Percentage offsets are not available for all native styles. Sliders,
+  indicators and scroll thumbs use measured pixel bounds.
+- Accessibility uses the GPUIX-supported role and ARIA subset.
+- Keyboard interactions require focus. Interactive components manage focus,
+  directional keys, Enter, Space, Escape and typeahead where applicable.
+- Closing an overlay restores focus to its trigger.
 
 ## Playground
 
-```bash
+```sh
 bun install
 bun run typecheck
 bun run dev
 ```
 
-`playground.tsx` 是 9 页 Clash Verge 风格工作台:首页、代理、订阅、连接、规则、
-日志、测试、组件、设置。启动窗口 1280×860,最小 1024×768,窄窗口收缩侧栏。
+The playground contains nine product-style pages plus an interactive component
+gallery. The proxy page exercises a 5,000-row native virtual list with a
+100-row application window.
 
-- 代理页是真实 5,000 条节点列表:业务层切片当前 100 行,GPUIX 原生
-  `<virtual-list>` 负责高度估算、可见范围和滚轮惯性。
-- 组件页(`gallery.tsx`)把全部组件家族挂成可交互样例:菜单、右键菜单、子菜单、
-  Dialog/AlertDialog/Drawer/Popover/Tooltip、Select/Combobox/Autocomplete、
-  表单校验、Slider 拖动、OTP 跳格、Toast、ScrollArea、Tabs、Accordion 等。
+## Android companion
 
-## Android
+The Android runtime, standalone Hermes host and APK/AAB CLI live in
+[`wdcodecn/gpuix-android`](https://github.com/wdcodecn/gpuix-android). A runnable
+example lives in
+[`wdcodecn/gpuix-app-starter`](https://github.com/wdcodecn/gpuix-app-starter).
+This repository remains focused on component source, theme contracts and
+interaction semantics.
 
-`android/` 是同一份 `playground.tsx` 与 `src` 的原生 Android 宿主:GPUI + wgpu
-渲染,Hermes 运行 JavaScript,不含 WebView。构建与安装见
-[android/README.md](android/README.md)。
+## License
 
-要把一个已有的 GPUIX React 项目接入同一个原生宿主,安装本包后在目标项目根目录执行:
-
-```sh
-bunx gpuix-android init --entry src/main.tsx --app-id com.example.myapp --name "My App"
-bunx gpuix-android build
-bunx gpuix-android install ADB_SERIAL
-```
-
-`init` 复制 `android/` 的宿主源码,但不会复制构建缓存、下载依赖或生成的 `.so`,并且
-拒绝覆盖已有的 `android/`。项目根目录的 `gpuix.android.json` 是唯一需要维护的配置:
-
-```json
-{
-  "entrypoint": "src/main.tsx",
-  "appId": "com.example.myapp",
-  "appName": "My App"
-}
-```
-
-CLI 的 `build` 与 `install` 只是调用目标项目已复制的脚本;应用仍由 GPUI/wgpu 绘制,
-并由独立 Hermes 执行 JavaScript,不会退回到 WebView 或 React Native View。
-
-## 发布
-
-仓库以源码分发:`files` 包含组件源码、README、许可证以及可复制的 `android/`
-原生宿主和 `gpuix-android` CLI;`exports` 提供根入口、`./merge-props`、
-`./use-render` 以及每个组件的子路径入口。本地 `dist/`、Android 构建缓存、下载
-依赖与生成的原生库不会进入发布内容。
+MIT. See [LICENSE](LICENSE).

@@ -188,7 +188,9 @@ export function popupListStyle(C: ThemeTokens): Style {
     flexDirection: 'column',
     gap: 3,
     minWidth: 200,
-    maxHeight: 340,
+    // Keep a nine-option selector (for example refresh rates up to 165 Hz)
+    // fully visible on a phone while still allowing longer menus to scroll.
+    maxHeight: 380,
     overflowY: 'scroll',
     pointerEvents: 'auto',
   }
