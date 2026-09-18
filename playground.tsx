@@ -48,6 +48,24 @@ const EMPTY_PERFORMANCE: PerformanceSnapshot = {
   gpuFps: 0,
 }
 
+type FrameHandle = number | ReturnType<typeof setTimeout>
+
+function scheduleFrame(callback: () => void): FrameHandle {
+  const request = Reflect.get(globalThis, 'requestAnimationFrame')
+  return typeof request === 'function'
+    ? (request as (next: () => void) => number)(callback)
+    : setTimeout(callback, 16)
+}
+
+function cancelFrame(handle: FrameHandle) {
+  const cancel = Reflect.get(globalThis, 'cancelAnimationFrame')
+  if (typeof cancel === 'function' && typeof handle === 'number') {
+    ;(cancel as (id: number) => void)(handle)
+  } else {
+    clearTimeout(handle as ReturnType<typeof setTimeout>)
+  }
+}
+
 function usePerformanceSnapshot(renderer: NativeRenderer | null, enabled: boolean) {
   const [snapshot, setSnapshot] = useState<PerformanceSnapshot>(EMPTY_PERFORMANCE)
   const jsFrames = useRef(0)
@@ -56,13 +74,13 @@ function usePerformanceSnapshot(renderer: NativeRenderer | null, enabled: boolea
 
   useEffect(() => {
     if (!enabled) return
-    let raf = 0
+    let raf: FrameHandle = 0
     let mounted = true
     const countFrame = () => {
       jsFrames.current += 1
-      if (mounted) raf = requestAnimationFrame(countFrame)
+      if (mounted) raf = scheduleFrame(countFrame)
     }
-    raf = requestAnimationFrame(countFrame)
+    raf = scheduleFrame(countFrame)
     const sample = () => {
       const now = performance.now()
       const previousAt = lastSampleAt.current || now - 500
@@ -87,7 +105,7 @@ function usePerformanceSnapshot(renderer: NativeRenderer | null, enabled: boolea
     const firstSample = setTimeout(sample, 120)
     return () => {
       mounted = false
-      cancelAnimationFrame(raf)
+      cancelFrame(raf)
       clearInterval(timer)
       clearTimeout(firstSample)
     }
