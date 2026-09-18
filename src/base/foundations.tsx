@@ -170,12 +170,39 @@ export function usePress(options: {
   const disabled = options.disabled ?? false
   const { hovered, hoverProps } = useHoverState()
   const { focused, focusProps } = useFocusState()
+  // GPUIX maps a short Android touch tap to the same mouse events used by
+  // desktop. Keep a tiny movement gate so a swipe that starts on a trigger
+  // cannot become an accidental click when the finger is released.
+  const gesture = useRef<{ x: number; y: number; moved: boolean } | null>(null)
   const canFocus = !(disabled && !options.focusableWhenDisabled)
   const pressProps = {
     role: options.role ?? 'button',
     tabIndex: canFocus ? 0 : -1,
     'aria-disabled': disabled || undefined,
-    onClick: (event: EventPayload) => { if (!disabled) options.onPress?.(event) },
+    onClick: (event: EventPayload) => {
+      if (disabled) return
+      const moved = gesture.current?.moved ?? false
+      gesture.current = null
+      if (!moved) options.onPress?.(event)
+    },
+    onMouseDown: (event: EventPayload) => {
+      if (disabled || (event.button !== undefined && event.button !== 0)) return
+      gesture.current = { x: event.x ?? 0, y: event.y ?? 0, moved: false }
+    },
+    onMouseMove: (event: EventPayload) => {
+      const active = gesture.current
+      if (!active || event.pressedButton !== 0) return
+      const dx = (event.x ?? active.x) - active.x
+      const dy = (event.y ?? active.y) - active.y
+      if (dx * dx + dy * dy > 64) active.moved = true
+    },
+    onMouseUp: (event: EventPayload) => {
+      const active = gesture.current
+      if (!active) return
+      const dx = (event.x ?? active.x) - active.x
+      const dy = (event.y ?? active.y) - active.y
+      if (dx * dx + dy * dy > 64) active.moved = true
+    },
     onKeyDown: (event: EventPayload) => {
       if (disabled) return
       options.onKeyDown?.(event)

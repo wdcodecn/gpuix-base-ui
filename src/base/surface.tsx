@@ -36,7 +36,12 @@ export function useItemCollection(): ItemCollection {
 export function useItemRegistration(collection: ItemCollection, item: CollectionItem): ItemHandle {
   const handle = useRef(item)
   handle.current = item
-  useEffect(() => collection.register(handle), [collection])
+  // `useItemCollection` deliberately re-renders its owner when an item mounts
+  // or unmounts so keyboard navigation sees the latest members. The returned
+  // collection object is therefore not a safe effect dependency: depending on
+  // it unregisters and registers every item after each version bump, creating
+  // an update loop that freezes chooser-heavy pages. `register` is stable.
+  useEffect(() => collection.register(handle), [collection.register])
   return handle
 }
 
