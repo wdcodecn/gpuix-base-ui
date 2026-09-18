@@ -6,7 +6,7 @@ import type { EventPayload } from '@gpuix/native'
 import type { PublicInstance as Instance } from '@gpuix/react'
 import { useTheme } from '../theme-context'
 import {
-  clamp, keyName, mergeStyle, useControllableState, useDismiss, usePress, useReturnFocus, useTypeahead,
+  clamp, keyName, mergeStyle, useAnchoredPosition, useControllableState, useDismiss, usePress, useReturnFocus, useTypeahead,
   type ChangeDetails, type ElementRef, type OpenReason, type Style,
 } from './foundations'
 import { menuItemStyle, popupListStyle, useItemCollection, useItemRegistration, useListNavigation } from './surface'
@@ -196,8 +196,10 @@ function SelectPopup(props: { children: ReactNode; style?: Style; testId?: strin
   })
   const dismissProps = useDismiss({ enabled: select.open, onDismiss: (event) => select.setOpen(false, 'outside-press', event) })
   const listRef = useRef<Instance | null>(null)
+  const position = useAnchoredPosition(select.triggerRef, select.open, 'bottom', 'start')
   if (!select.open) return null
   return <anchored
+    position={position}
     side="bottom"
     align="start"
     gap={7}
@@ -624,8 +626,10 @@ function FilterablePopup(props: { children: ReactNode; style?: Style; testId?: s
     onSelect: (item, event) => selectFilterableItem(filterable, item, event),
   })
   const dismissProps = useDismiss({ enabled: filterable.open, onDismiss: (event) => filterable.setOpen(false, 'outside-press', event) })
+  const position = useAnchoredPosition(filterable.inputRef, filterable.open, 'bottom', 'start')
   if (!filterable.open) return null
   return <anchored
+    position={position}
     side="bottom"
     align="start"
     gap={7}

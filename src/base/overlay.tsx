@@ -8,7 +8,7 @@ import { useTheme } from '../theme-context'
 import {
   cloneElement, isValidElement, type ReactElement } from 'react'
 import {
-  isActivationKey, keyName, mergeStyle, useControllableState, useDismiss, usePress, useReturnFocus, useRovingFocus,
+  isActivationKey, keyName, mergeStyle, useAnchoredPosition, useControllableState, useDismiss, usePress, useReturnFocus, useRovingFocus,
   type ChangeDetails, type OpenReason, type Style,
 } from './foundations'
 import { menuItemStyle, popupListStyle, useItemCollection, useItemRegistration, useListNavigation } from './surface'
@@ -398,9 +398,11 @@ function PopoverPopup(props: { children: ReactNode; style?: Style; testId?: stri
   const { tokens: C } = useTheme()
   const popover = useOverlay('Popover.Popup')
   const positioner = useContext(PositionerContext)
+  const position = useAnchoredPosition(popover.triggerRef, popover.open, positioner.side, positioner.align)
   const dismissProps = useDismiss({ enabled: popover.open && popover.dismissable, onDismiss: (event) => popover.setOpen(false, 'outside-press', event) })
   if (!popover.open) return null
   return <anchored
+    position={position}
     side={positioner.side}
     align={positioner.align}
     gap={positioner.gap}
@@ -443,13 +445,15 @@ function PopoverViewport(props: { children: ReactNode; style?: Style }) {
   return <div style={mergeStyle({ display: 'flex', flexDirection: 'column', gap: 6 }, props.style)}>{props.children}</div>
 }
 
-function PopoverRoot(props: {
+type PopoverRootProps = {
   open?: boolean
   defaultOpen?: boolean
   onOpenChange?: (open: boolean, details: ChangeDetails) => void
   modal?: boolean | 'trap-focus'
   children: ReactNode
-}) {
+}
+
+function PopoverRoot(props: PopoverRootProps) {
   return <OverlayRoot open={props.open} defaultOpen={props.defaultOpen} onOpenChange={props.onOpenChange} modal={false} dismissable>{props.children}</OverlayRoot>
 }
 
@@ -528,9 +532,11 @@ function PreviewCardPopup(props: { children: ReactNode; style?: Style; testId?: 
   const { tokens: C } = useTheme()
   const preview = useOverlay('PreviewCard.Popup')
   const positioner = useContext(PositionerContext)
+  const position = useAnchoredPosition(preview.triggerRef, preview.open, positioner.side, positioner.align)
   const dismissProps = useDismiss({ enabled: preview.open && preview.dismissable, onDismiss: (event) => preview.setOpen(false, 'outside-press', event) })
   if (!preview.open) return null
   return <anchored
+    position={position}
     side={positioner.side}
     align={positioner.align}
     gap={positioner.gap}
@@ -563,7 +569,23 @@ function PreviewCardPopup(props: { children: ReactNode; style?: Style; testId?: 
   </anchored>
 }
 
-export const PreviewCard = Object.assign(PopoverRoot, { ...popoverParts, Trigger: PreviewCardTrigger, Popup: PreviewCardPopup, Title: undefined, Description: undefined, Close: undefined })
+// Do not Object.assign onto PopoverRoot here. PopoverRoot is also the function
+// carrying Popover's static parts; mutating it made `Popover.Popup` silently
+// become `PreviewCard.Popup`, so clicking a normal Popover rendered the wrong
+// component and crashed the gallery. A distinct wrapper keeps both families'
+// compound namespaces independent.
+function PreviewCardRoot(props: PopoverRootProps) {
+  return <PopoverRoot {...props} />
+}
+
+export const PreviewCard = Object.assign(PreviewCardRoot, {
+  Root: PreviewCardRoot,
+  Trigger: PreviewCardTrigger,
+  Portal: DialogPortal,
+  Positioner: PopoverPositioner,
+  Popup: PreviewCardPopup,
+  Arrow: PopoverArrow,
+})
 
 type TooltipContextValue = {
   open: boolean
@@ -611,18 +633,31 @@ function TooltipTrigger(props: { children: ReactNode; style?: Style; testId?: st
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clear = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null } }
   useEffect(() => clear, [])
-  return <div
-    ref={tooltip.triggerRef as never}
-    testId={props.testId}
-    tabIndex={0}
-    onMouseEnter={() => { if (tooltip.disabled) return; clear(); timer.current = setTimeout(() => tooltip.setOpen(true, 'trigger-hover'), props.delay ?? tooltip.delay) }}
-    onMouseLeave={() => { clear(); if (tooltip.open) timer.current = setTimeout(() => tooltip.setOpen(false, 'trigger-hover'), props.closeDelay ?? tooltip.closeDelay) }}
-    onFocus={() => { if (!tooltip.disabled) tooltip.setOpen(true, 'trigger-focus') }}
-    onBlur={() => tooltip.setOpen(false, 'focus-out')}
-    onClick={() => { if (props.closeOnClick !== false) tooltip.setOpen(false, 'trigger-press') }}
-    onKeyDown={(event: EventPayload) => { if (keyName(event) === 'escape') tooltip.setOpen(false, 'escape-key', event) }}
-    style={mergeStyle({ display: 'flex', flexDirection: 'row', alignItems: 'center' }, props.style)}
-  >{props.children}</div>
+  const toggle = (event: EventPayload) => {
+    if (tooltip.disabled) return
+    if (tooltip.open && props.closeOnClick !== false) tooltip.setOpen(false, 'trigger-press', event)
+    else tooltip.setOpen(true, 'trigger-press', event)
+  }
+  const { pressProps } = usePress({
+    disabled: tooltip.disabled,
+    onPress: toggle,
+    onKeyDown: (event) => { if (keyName(event) === 'escape') tooltip.setOpen(false, 'escape-key', event) },
+  })
+  const triggerProps = {
+    ...pressProps,
+    ref: tooltip.triggerRef as never,
+    testId: props.testId,
+    onMouseEnter: () => { if (tooltip.disabled) return; clear(); timer.current = setTimeout(() => tooltip.setOpen(true, 'trigger-hover'), props.delay ?? tooltip.delay) },
+    onMouseLeave: () => { clear(); if (tooltip.open) timer.current = setTimeout(() => tooltip.setOpen(false, 'trigger-hover'), props.closeDelay ?? tooltip.closeDelay) },
+    style: mergeStyle({ display: 'flex', flexDirection: 'row', alignItems: 'center' }, props.style),
+  }
+  // A Button (or another interactive child) consumes the native click at its
+  // own element. Clone it with the trigger handlers so Tooltip works for both
+  // composed controls and plain text children, instead of relying on bubbling
+  // through a wrapper that GPUI does not guarantee.
+  const child = props.children as ReactElement | undefined
+  if (isValidElement(child)) return cloneElement(child, mergeProps(child.props as Record<string, unknown>, triggerProps as Record<string, unknown>) as never)
+  return <div {...triggerProps}>{props.children}</div>
 }
 
 function TooltipPopup(props: { children: ReactNode; style?: Style; testId?: string }) {
@@ -630,7 +665,8 @@ function TooltipPopup(props: { children: ReactNode; style?: Style; testId?: stri
   const tooltip = useContext(TooltipContext)
   if (!tooltip) throw new Error('Tooltip.Popup must be used inside Tooltip.Root')
   if (!tooltip.open) return null
-  return <anchored side="top" align="center" gap={7} deferred priority={3}>
+  const position = useAnchoredPosition(tooltip.triggerRef, tooltip.open, 'top', 'center')
+  return <anchored position={position} side="top" align="center" gap={7} deferred priority={3}>
     <div
       role="tooltip"
       testId={props.testId}
@@ -708,6 +744,7 @@ function MenuRoot(props: {
 const MenubarContext = createContext<{ register: (ref: React.MutableRefObject<Instance | null>) => number; keyDownFor: (index: number) => (event: EventPayload) => void } | null>(null)
 
 function MenuTrigger(props: { children: ReactNode; style?: Style; testId?: string; ariaLabel?: string; disabled?: boolean; openOnHover?: boolean; delay?: number; closeDelay?: number; payload?: unknown }) {
+  const { tokens: C } = useTheme()
   const menu = useContext(MenuContext)
   if (!menu) throw new Error('Menu.Trigger must be used inside Menu.Root')
   const menubar = useContext(MenubarContext)
@@ -740,7 +777,10 @@ function MenuTrigger(props: { children: ReactNode; style?: Style; testId?: strin
       if (timer.current) clearTimeout(timer.current)
       timer.current = setTimeout(() => menu.setOpen(false, 'trigger-hover'), props.closeDelay ?? 0)
     }}
-  ><Chevron open={menu.open} size={11} /></TriggerSurface>
+  >
+    <text style={{ flexGrow: 1, fontFamily: 'Helvetica', fontSize: 13, color: C.text }}>{props.children}</text>
+    <Chevron open={menu.open} size={11} />
+  </TriggerSurface>
 }
 
 function MenuSeparator() {
@@ -966,12 +1006,17 @@ function MenuPopup(props: { children: ReactNode; style?: Style; testId?: string;
       data.onSelect?.()
     },
   })
+  const side = menu.nested ? 'right' : 'bottom'
+  const position = useAnchoredPosition(menu.triggerRef, menu.open, side, 'start')
   const dismissProps = useDismiss({ enabled: menu.open, onDismiss: (event) => menu.setOpen(false, 'outside-press', event) })
   if (!menu.open || menu.disabled) return null
   return <anchored
-    side={menu.nested ? 'right' : 'bottom'}
-    align={menu.nested ? 'start' : 'center'}
-    gap={4}
+    position={position}
+    side={side}
+    align="start"
+    gap={6}
+    fit="snap"
+    snapMargin={8}
     deferred
     priority={3}
     occlude
@@ -1044,8 +1089,13 @@ function ContextMenuRoot(props: {
     open, setOpen: (next, reason, event) => setOpen(next, reason, event),
     disabled: props.disabled ?? false, collection, triggerRef, nested: false,
   }), [open, setOpen, props.disabled, collection])
-  return <ContextMenuContext.Provider value={{ context, position, setPosition }}>
-    {props.children}
+  const contextValue = { context, position, setPosition }
+  // ContextMenu.Item reuses the same collection/keyboard implementation as
+  // Menu.Item. Provide the menu context here as well; without this bridge a
+  // right-click opened the popup and then crashed while rendering its items
+  // with "Menu.Item must be used inside Menu.Root".
+  return <ContextMenuContext.Provider value={contextValue}>
+    <MenuContext.Provider value={context}>{props.children}</MenuContext.Provider>
   </ContextMenuContext.Provider>
 }
 
@@ -1058,15 +1108,38 @@ const ContextMenuContext = createContext<{
 function ContextMenuTrigger(props: { children: ReactNode; style?: Style; testId?: string }) {
   const value = useContext(ContextMenuContext)
   if (!value) throw new Error('ContextMenu.Trigger must be used inside ContextMenu.Root')
-  const onContext = (event: EventPayload) => {
-    if (event.button !== 2 && !event.isRightClick) return
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearLongPress = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+  }
+  useEffect(() => clearLongPress, [])
+  const openAt = (event: EventPayload) => {
     value.setPosition({ x: event.x ?? 0, y: event.y ?? 0 })
     value.context.setOpen(true, 'trigger-press', event)
   }
+  const onContext = (event: EventPayload) => {
+    if (event.button !== 2 && !event.isRightClick) return
+    clearLongPress()
+    openAt(event)
+  }
+  const onMouseDown = (event: EventPayload) => {
+    clearLongPress()
+    if (event.button === 2 || event.isRightClick) { onContext(event); return }
+    // Android touch is delivered as a primary mouse gesture by the current
+    // native bridge. Treat a held primary press as the context-menu gesture,
+    // while cancelling on release/move so ordinary taps remain ordinary taps.
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null
+      openAt(event)
+    }, 500)
+  }
   const handlers = {
     testId: props.testId,
-    onMouseDown: onContext,
+    onMouseDown,
+    onMouseUp: clearLongPress,
+    onMouseMove: clearLongPress,
     onAuxClick: onContext,
+    onClick: (event: EventPayload) => { if (event.isRightClick || event.button === 2) onContext(event) },
     style: mergeStyle({ display: 'flex', flexDirection: 'column' }, props.style),
   }
   const child = props.children as ReactElement | undefined

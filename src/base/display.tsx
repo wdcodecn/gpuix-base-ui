@@ -776,12 +776,15 @@ function ToastPortal(props: { children: ReactNode }) {
 
 function ToastViewport(props: { children?: ReactNode; style?: Style; testId?: string }) {
   const toasts = useToastList()
+  // Hooks must be called in the same order on the empty and populated states.
+  // Calling useWindowSize only after the first toast is added makes React throw
+  // "Rendered more hooks than during the previous render" on the first click.
+  const { width, height } = useWindowSize()
   // An empty full-window anchored layer is not visually inert in every native
   // backend: GPUI may allocate it as an opaque high-priority surface and hide
   // the page underneath. Mount the viewport only while there is a toast to
   // paint; this also removes an unnecessary retained subtree from idle pages.
   if (toasts.length === 0) return null
-  const { width, height } = useWindowSize()
   const expanded = toasts.length > 0
   const ariaProps = { 'aria-live': 'polite' as const, 'aria-atomic': false }
   const dataProps = { 'data-expanded': expanded }

@@ -653,7 +653,10 @@ function OTPFieldRoot(props: {
   const refs = useRef(new Map<number, ElementRef>())
   const counter = useRef(0)
   const completed = useRef(false)
-  const validationType = props.validationType ?? 'numeric'
+  // OTP cells are character slots, not numeric-only inputs. Consumers can
+  // Consumers can opt into numeric/alpha/alphanumeric validation explicitly;
+  // the generic OTP primitive accepts one character of either kind by default.
+  const validationType = props.validationType ?? 'none'
   const filter = (raw: string) => {
     const normalized = props.normalizeValue ? props.normalizeValue(raw) : raw
     return Array.from(normalized).filter((char) => {
@@ -663,6 +666,8 @@ function OTPFieldRoot(props: {
       return /[a-zA-Z0-9]/.test(char)
     }).join('')
   }
+  const valueRef = useRef(value)
+  valueRef.current = value
   const commit = (next: string) => {
     const clamped = next.slice(0, props.length)
     setValue(clamped, 'input-change')
@@ -682,16 +687,21 @@ function OTPFieldRoot(props: {
     applyText: (index, raw, event) => {
       const cleaned = filter(raw)
       if (cleaned.length === 0 && raw.length > 0) { props.onValueInvalid?.(raw, { reason: 'input-change', event, cancel: () => undefined, isCanceled: false }); return }
-      if (cleaned.length > 1) {
-        commit(`${value.slice(0, index)}${cleaned}`)
-        focusCellAt(index + cleaned.length)
-        return
+      const chars = Array.from(valueRef.current)
+      while (chars.length < props.length) chars.push('')
+      // A paste or IME commit is distributed across the remaining cells,
+      // while a normal key edit still changes exactly one cell.
+      for (let offset = 0; offset < cleaned.length && index + offset < props.length; offset += 1) {
+        chars[index + offset] = cleaned[offset]
       }
-      commit(`${value.slice(0, index)}${cleaned}${value.slice(index + 1)}`)
+      commit(chars.join('').slice(0, props.length))
       if (cleaned) focusCellAt(index + 1)
     },
     setCellValue: (index, char, event) => {
-      commit(`${value.slice(0, index)}${char}${value.slice(index + 1)}`)
+      const chars = Array.from(valueRef.current)
+      while (chars.length < props.length) chars.push('')
+      chars[clamp(index, 0, props.length - 1)] = Array.from(char)[0] ?? ''
+      commit(chars.join('').slice(0, props.length))
       void event
     },
     registerCell: (index, ref) => { refs.current.set(index, ref) },

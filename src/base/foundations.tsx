@@ -81,6 +81,24 @@ export function useBounds(ref: ElementRef) {
   }, [ref, renderer])
 }
 
+export function useAnchoredPosition(
+  ref: ElementRef,
+  open: boolean,
+  side: 'top' | 'right' | 'bottom' | 'left',
+  align: 'start' | 'center' | 'end',
+) {
+  const getBounds = useBounds(ref)
+  if (!open) return undefined
+  const bounds = getBounds()
+  if (!bounds) return undefined
+  const horizontal = align === 'start' ? bounds.x : align === 'end' ? bounds.x + bounds.width : bounds.x + bounds.width / 2
+  const vertical = align === 'start' ? bounds.y : align === 'end' ? bounds.y + bounds.height : bounds.y + bounds.height / 2
+  if (side === 'top') return { x: horizontal, y: bounds.y }
+  if (side === 'right') return { x: bounds.x + bounds.width, y: vertical }
+  if (side === 'left') return { x: bounds.x, y: vertical }
+  return { x: horizontal, y: bounds.y + bounds.height }
+}
+
 export function useFocusElement() {
   const { renderer } = useGpuix()
   return useCallback((ref: ElementRef | null | undefined) => {

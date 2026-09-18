@@ -148,7 +148,7 @@ function NumberOtpDemo() {
     </NumberField>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <text style={{ fontSize: 11, color: '#71717A' }}>6 位数字验证码</text>
-      <OTPField length={6} value={otp} onValueChange={setOtp} testId="gallery-otp">
+      <OTPField length={6} value={otp} onValueChange={setOtp} validationType="numeric" testId="gallery-otp">
         <OTPField.Group>
           <OTPField.Input testId="gallery-otp-0" /><OTPField.Input testId="gallery-otp-1" /><OTPField.Input testId="gallery-otp-2" />
           <OTPField.Separator />
@@ -447,7 +447,7 @@ export function Gallery() {
   return <Toast.Provider timeout={4000}>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-        {sections.map(([value, label]) => <Button key={value} size="sm" variant={section === value ? 'primary' : 'secondary'} onClick={() => setSection(value)}>{label}</Button>)}
+        {sections.map(([value, label]) => <Button key={value} size="sm" variant={section === value ? 'primary' : 'secondary'} testId={`gallery-section-${value}`} onClick={() => setSection(value)}>{label}</Button>)}
       </div>
       {section === 'overview' && <OverviewSection />}
       {section === 'buttons' && <ButtonsDemo />}
