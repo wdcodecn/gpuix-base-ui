@@ -434,15 +434,28 @@ function MoreDemo() {
 }
 
 export function Gallery() {
+  const [section, setSection] = useState('overview')
+  const sections = [
+    ['overview', '总览'],
+    ['buttons', '按钮'],
+    ['forms', '表单'],
+    ['choosers', '选择'],
+    ['overlays', '浮层'],
+    ['display', '展示'],
+    ['more', '其他'],
+  ] as const
   return <Toast.Provider timeout={4000}>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <OverviewSection />
-      <ButtonsDemo />
-      <FormsSection />
-      <ChoosersSection />
-      <OverlaysSection />
-      <DisplaySection />
-      <MoreDemo />
+      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        {sections.map(([value, label]) => <Button key={value} size="sm" variant={section === value ? 'primary' : 'secondary'} onClick={() => setSection(value)}>{label}</Button>)}
+      </div>
+      {section === 'overview' && <OverviewSection />}
+      {section === 'buttons' && <ButtonsDemo />}
+      {section === 'forms' && <FormsSection />}
+      {section === 'choosers' && <ChoosersSection />}
+      {section === 'overlays' && <OverlaysSection />}
+      {section === 'display' && <DisplaySection />}
+      {section === 'more' && <MoreDemo />}
     </div>
     <Toast.Portal><Toast.Viewport testId="gallery-toast-viewport"><ToastList /></Toast.Viewport></Toast.Portal>
   </Toast.Provider>
