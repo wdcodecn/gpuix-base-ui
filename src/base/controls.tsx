@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode }
 import type { EventPayload } from '@gpuix/native'
 import type { PublicInstance as Instance } from '@gpuix/react'
 import { useTheme } from '../theme-context'
-import { mergeStyle, useControllableState, usePress, useRovingFocus, type ChangeDetails, type ElementRef, type Style } from './foundations'
+import { mergeStyle, useControllableState, usePress, useRovingFocus, type ChangeDetails, type Style } from './foundations'
 import { Button, type ButtonProps } from './button'
 
 type Roving = ReturnType<typeof useRovingFocus>
@@ -43,7 +43,7 @@ export function Toggle(props: {
   useEffect(() => {
     if (register) indexRef.current = register(ref)
   }, [register])
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     disabled,
     onPress: () => {
       if (group) group.toggle(props.value ?? '')
@@ -194,7 +194,7 @@ function ToolbarLink(props: { children: ReactNode; onClick?: () => void; disable
   const { tokens: C } = useTheme()
   const toolbar = useContext(ToolbarContext)
   const { ref, onKeyDown } = useToolbarItem(!props.disabled)
-  const { pressProps, hovered, focused } = usePress({ disabled: props.disabled ?? toolbar?.disabled, onPress: props.onClick, onKeyDown })
+  const { pressProps, focused } = usePress({ disabled: props.disabled ?? toolbar?.disabled, trackFocus: true, onPress: props.onClick, onKeyDown })
   return <div {...pressProps} ref={ref as never} testId={props.testId} style={mergeStyle({ minHeight: 34, display: 'flex', alignItems: 'center', paddingLeft: 8, paddingRight: 8, borderRadius: 7, cursor: 'pointer', backgroundColor: undefined }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 13, color: C.text, textDecoration: focused ? 'underline' : 'none' }}>{props.children}</text>
   </div>

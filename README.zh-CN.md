@@ -22,8 +22,10 @@
 
 `Radio` 与 `RadioGroup.Item` 等价,`Tabs.Trigger/Content` 是 `Tabs.Tab/Panel` 的
 别名;其余部件名与官方文档逐项对应。仓库另外提供 `List` 组合层
-(`List.Root/Header/Toolbar/Item/ItemLeading/ItemContent/ItemTitle/ItemDescription/ItemMeta/ItemActions/Section/Separator/Empty/Loading`)
+(`List.Root/Header/Toolbar/Item/ItemLeading/ItemContent/ItemTitle/ItemDescription/ItemMeta/ItemActions/Section/Separator/Empty/Loading/Virtual`)
 和 `Card`、`Badge`、`Glyph`、`IconButton` 等应用级预设。
+
+关于无轮询视口订阅、原生交互态与 `List.Virtual` 等性能优化设计，见 [docs/PERFORMANCE.zh-CN.md](docs/PERFORMANCE.zh-CN.md)。
 
 ## 目录结构
 
@@ -62,9 +64,12 @@ src/<name>.ts              单组件子路径入口,与官方命名一一对应
 
 ```bash
 bun install
-bun run typecheck
+bun run check
 bun run dev
 ```
+
+日常可用 `bun run lint --type-aware --type-check` 一次跑 Oxlint 和 tsrs 检查。
+`bun run check` 还会用 TypeScript 编译器复核，CI 执行这条命令。
 
 `playground.tsx` 是 9 页 Clash Verge 风格工作台:首页、代理、订阅、连接、规则、
 日志、测试、组件、设置。启动窗口 1280×860,最小 1024×768,窄窗口收缩侧栏。
@@ -77,10 +82,13 @@ bun run dev
 
 ## Android 配套
 
-Android native host、Hermes、GPUI/wgpu 运行时与 APK/AAB CLI 已拆分到独立框架
-[`wdcodecn/gpuix-android`](https://github.com/wdcodecn/gpuix-android)。可运行示例位于
-[`wdcodecn/gpuix-app-starter`](https://github.com/wdcodecn/gpuix-app-starter)。本仓库只维护
-组件源码、主题与交互语义，不再携带平台构建工具链。
+使用同级目录的 [`gpuix-android`](https://github.com/wdcodecn/gpuix-android) 在真机运行这个
+九页工作台。首次执行 `init` 为 `playground.tsx` 生成 Android 宿主。
+
+```sh
+bun ../gpuix-android/scripts/gpuix.ts init --entry playground.tsx --app-id dev.gpuix.baseui --name "GPUIX Base UI"
+bun ../gpuix-android/scripts/gpuix.ts run DEVICE_SERIAL
+```
 
 ## 发布
 

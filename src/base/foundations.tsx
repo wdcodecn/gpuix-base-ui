@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { useGpuix } from '@gpuix/react'
+import {
+  observeWindowInsets,
+  observeWindowSize,
+  readWindowInsets,
+  readWindowSize,
+  type NativeRenderer as HostNativeRenderer,
+  type WindowInsets,
+  type WindowSize,
+} from '@gpuix/native/host'
 import type { EventPayload } from '@gpuix/native'
 import type { PublicInstance as Instance } from '@gpuix/react'
 
@@ -168,38 +177,148 @@ export function isModKey(event: EventPayload) {
   return Boolean(event.modifiers?.cmd || event.modifiers?.ctrl)
 }
 
-export function useHoverState() {
+export function useHoverState(enabled = true) {
   const [hovered, setHovered] = useState(false)
-  return { hovered, hoverProps: { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } }
+  return {
+    hovered: enabled ? hovered : false,
+    hoverProps: enabled ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } : {},
+  }
 }
 
-export function useFocusState() {
+export function useFocusState(enabled = true) {
   const [focused, setFocused] = useState(false)
-  return { focused, focusProps: { onFocus: () => setFocused(true), onBlur: () => setFocused(false) } }
+  return {
+    focused: enabled ? focused : false,
+    focusProps: enabled ? { onFocus: () => setFocused(true), onBlur: () => setFocused(false) } : {},
+  }
+}
+
+type ViewportPushHub = {
+  subscribeSize?: (listener: (size: WindowSize) => void) => () => void
+  subscribeInsets?: (listener: (insets: WindowInsets) => void) => () => void
+}
+
+function createSharedViewportStore<T>(
+  read: (renderer: HostNativeRenderer | null) => T,
+  observe: (renderer: HostNativeRenderer | null, cb: (next: T) => void, opts: { intervalMs?: number | false }) => () => void,
+  subscribePush: (hub: ViewportPushHub | undefined, cb: (next: T) => void) => (() => void) | undefined,
+  defaultIntervalMs: number,
+) {
+  let current = read(null)
+  let currentRenderer: HostNativeRenderer | null = null
+  let stopObserve: (() => void) | null = null
+  let stopPush: (() => void) | null = null
+  const listeners = new Set<() => void>()
+
+  const notify = (next: T) => {
+    current = next
+    for (const listener of listeners) listener()
+  }
+
+  const start = (renderer: HostNativeRenderer | null, intervalMs: number) => {
+    stopObserve?.()
+    stopObserve = null
+    stopPush?.()
+    stopPush = null
+    currentRenderer = renderer
+    const hub = Reflect.get(globalThis, '__gpuixViewport') as ViewportPushHub | undefined
+    const pushUnsub = subscribePush(hub, notify)
+    if (pushUnsub) {
+      stopPush = pushUnsub
+      current = read(renderer)
+      return
+    }
+    stopObserve = observe(renderer, notify, { intervalMs })
+  }
+
+  return {
+    use(renderer: HostNativeRenderer | null, intervalMs = defaultIntervalMs): T {
+      const subscribe = useCallback((listener: () => void) => {
+        const shouldStart = listeners.size === 0 || currentRenderer !== renderer
+        listeners.add(listener)
+        if (shouldStart) start(renderer, intervalMs)
+        return () => {
+          listeners.delete(listener)
+          if (listeners.size === 0) {
+            stopObserve?.()
+            stopObserve = null
+            stopPush?.()
+            stopPush = null
+            currentRenderer = null
+          }
+        }
+      }, [renderer, intervalMs])
+      useEffect(() => {
+        if (listeners.size > 0 && currentRenderer !== renderer) {
+          start(renderer, intervalMs)
+        }
+      }, [renderer, intervalMs])
+      return useSyncExternalStore(subscribe, () => current)
+    },
+  }
+}
+
+const sharedSizeStore = createSharedViewportStore<WindowSize>(
+  (renderer) => readWindowSize(renderer),
+  (renderer, cb, opts) => observeWindowSize(renderer, cb, opts),
+  (hub, cb) => hub?.subscribeSize?.(cb),
+  250,
+)
+
+const sharedInsetsStore = createSharedViewportStore<WindowInsets>(
+  (renderer) => readWindowInsets(renderer),
+  (renderer, cb, opts) => observeWindowInsets(renderer, cb, opts),
+  (hub, cb) => hub?.subscribeInsets?.(cb),
+  250,
+)
+
+/**
+ * Shared viewport size hook. Uses push notifications with zero timer polling
+ * when provided by the native host, and shares a single observer otherwise.
+ */
+export function useViewportSize(options: { intervalMs?: number } = {}): WindowSize {
+  const { renderer } = useGpuix()
+  return sharedSizeStore.use(renderer as unknown as HostNativeRenderer | null, options.intervalMs)
+}
+
+/**
+ * Shared safe-area and IME insets hook. Uses push notifications with zero timer
+ * polling when provided by the native host, and shares a single observer otherwise.
+ */
+export function useViewportInsets(options: { intervalMs?: number } = {}): WindowInsets {
+  const { renderer } = useGpuix()
+  return sharedInsetsStore.use(renderer as unknown as HostNativeRenderer | null, options.intervalMs)
 }
 
 export function usePress(options: {
   disabled?: boolean
   focusableWhenDisabled?: boolean
   role?: string
+  trackHover?: boolean
+  trackFocus?: boolean
   onPress?: (event: EventPayload) => void
   onKeyDown?: (event: EventPayload) => void
 }) {
   const disabled = options.disabled ?? false
-  const { hovered, hoverProps } = useHoverState()
-  const { focused, focusProps } = useFocusState()
-  // GPUIX maps a short Android touch tap to the same mouse events used by
-  // desktop. Keep a tiny movement gate so a swipe that starts on a trigger
-  // cannot become an accidental click when the finger is released.
+  const { hovered, hoverProps } = useHoverState(options.trackHover ?? false)
+  const { focused, focusProps } = useFocusState(options.trackFocus ?? false)
+  // Keep a start-coordinate slop check between mouseDown and mouseUp/click so a
+  // touch swipe never becomes an accidental click without paying per-frame mouseMove IPC.
   const gesture = useRef<{ x: number; y: number; moved: boolean } | null>(null)
   const canFocus = !(disabled && !options.focusableWhenDisabled)
+  const exceededSlop = (active: { x: number; y: number }, event: EventPayload) => {
+    const dx = (event.x ?? active.x) - active.x
+    const dy = (event.y ?? active.y) - active.y
+    return dx * dx + dy * dy > 64
+  }
   const pressProps = {
     role: options.role ?? 'button',
     tabIndex: canFocus ? 0 : -1,
     'aria-disabled': disabled || undefined,
     onClick: (event: EventPayload) => {
       if (disabled) return
-      const moved = gesture.current?.moved ?? false
+      const active = gesture.current
+      const moved = Boolean(active?.moved || (active && exceededSlop(active, event)))
       gesture.current = null
       if (!moved) options.onPress?.(event)
     },
@@ -207,19 +326,10 @@ export function usePress(options: {
       if (disabled || (event.button !== undefined && event.button !== 0)) return
       gesture.current = { x: event.x ?? 0, y: event.y ?? 0, moved: false }
     },
-    onMouseMove: (event: EventPayload) => {
-      const active = gesture.current
-      if (!active || event.pressedButton !== 0) return
-      const dx = (event.x ?? active.x) - active.x
-      const dy = (event.y ?? active.y) - active.y
-      if (dx * dx + dy * dy > 64) active.moved = true
-    },
     onMouseUp: (event: EventPayload) => {
       const active = gesture.current
       if (!active) return
-      const dx = (event.x ?? active.x) - active.x
-      const dy = (event.y ?? active.y) - active.y
-      if (dx * dx + dy * dy > 64) active.moved = true
+      if (exceededSlop(active, event)) active.moved = true
     },
     onKeyDown: (event: EventPayload) => {
       if (disabled) return

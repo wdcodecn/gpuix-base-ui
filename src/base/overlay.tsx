@@ -1,14 +1,13 @@
 import {
   createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react'
-import { useWindowSize } from '@gpuix/react'
 import type { EventPayload } from '@gpuix/native'
 import type { PublicInstance as Instance } from '@gpuix/react'
 import { useTheme } from '../theme-context'
 import {
   cloneElement, isValidElement, type ReactElement } from 'react'
 import {
-  isActivationKey, keyName, mergeStyle, useAnchoredPosition, useControllableState, useDismiss, usePress, useReturnFocus, useRovingFocus,
+  keyName, mergeStyle, useAnchoredPosition, useControllableState, useDismiss, usePress, useReturnFocus, useRovingFocus,
   type ChangeDetails, type OpenReason, type Style,
 } from './foundations'
 import { menuItemStyle, popupListStyle, useItemCollection, useItemRegistration, useListNavigation } from './surface'
@@ -77,7 +76,7 @@ function TriggerSurface(props: {
   autoFocus?: boolean
 }) {
   const { tokens: C } = useTheme()
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     disabled: props.disabled,
     focusableWhenDisabled: true,
     onPress: props.onPress,
@@ -147,12 +146,11 @@ function DialogPortal(props: { children: ReactNode }) { return <>{props.children
 function DialogBackdrop(props: { children?: ReactNode; style?: Style }) {
   const { tokens: C } = useTheme()
   const dialog = useOverlay('Dialog.Backdrop')
-  const { width, height } = useWindowSize()
   if (!dialog.open) return null
-  return <anchored position={{ x: 0, y: 0 }} priority={3}>
+  return <anchored fill="window" priority={3} style={{ backgroundColor: 'transparent' }}>
     <div
       onClick={() => { if (dialog.dismissable) dialog.setOpen(false, 'outside-press') }}
-      style={mergeStyle({ width, height, backgroundColor: `${C.canvas}CC` }, props.style)}
+      style={mergeStyle({ width: '100%', height: '100%', backgroundColor: `${C.canvas}CC` }, props.style)}
     >{props.children}</div>
   </anchored>
 }
@@ -172,13 +170,12 @@ function DialogPopup(props: {
 }) {
   const { tokens: C } = useTheme()
   const dialog = useOverlay('Dialog.Popup')
-  const { width, height } = useWindowSize()
   if (!dialog.open) return null
-  return <anchored position={{ x: 0, y: 0 }} priority={4} occlude>
+  return <anchored fill="window" priority={4} occlude style={{ backgroundColor: 'transparent' }}>
     <div
       onMouseDown={() => { if (dialog.dismissable) dialog.setOpen(false, 'outside-press') }}
       onKeyDown={(event: EventPayload) => { if (keyName(event) === 'escape') dialog.setOpen(false, 'escape-key', event) }}
-      style={{ width, height, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+      style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
     >
       <div
         ref={dialog.popupRef as never}
@@ -190,7 +187,7 @@ function DialogPopup(props: {
         onMouseDown={(event: EventPayload) => { void event }}
         style={mergeStyle({
           width: 420,
-          maxWidth: width - 80,
+          maxWidth: '88%',
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
@@ -219,7 +216,7 @@ function DialogDescription(props: { children: ReactNode; style?: Style }) {
 function DialogClose(props: { children?: ReactNode; style?: Style; testId?: string }) {
   const dialog = useOverlay('Dialog.Close')
   const { tokens: C } = useTheme()
-  const { pressProps, hovered } = usePress({ onPress: () => dialog.setOpen(false, 'close-press'), disabled: dialog.disabled })
+  const { pressProps } = usePress({ onPress: () => dialog.setOpen(false, 'close-press'), disabled: dialog.disabled })
   return <div {...pressProps} testId={props.testId} style={mergeStyle({ alignSelf: 'flex-start', minHeight: 32, display: 'flex', alignItems: 'center', paddingLeft: 12, paddingRight: 12, borderRadius: 8, borderWidth: 1, borderColor: C.borderStrong, backgroundColor: C.control, cursor: 'pointer' }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 12, fontWeight: 700, color: C.text }}>{props.children ?? '关闭'}</text>
   </div>
@@ -279,17 +276,16 @@ function DrawerPopup(props: { children: ReactNode; style?: Style; testId?: strin
   const { tokens: C } = useTheme()
   const drawer = useOverlay('Drawer.Popup')
   const { swipeDirection } = useContext(DrawerContext)
-  const { width, height } = useWindowSize()
   if (!drawer.open) return null
   const isBottom = swipeDirection === 'down'
   const isTop = swipeDirection === 'up'
   const isLeft = swipeDirection === 'right'
   const isRight = swipeDirection === 'left'
-  return <anchored position={{ x: 0, y: 0 }} priority={4} occlude>
+  return <anchored fill="window" priority={4} occlude style={{ backgroundColor: 'transparent' }}>
     <div
       onMouseDown={() => { if (drawer.dismissable) drawer.setOpen(false, 'outside-press') }}
       onKeyDown={(event: EventPayload) => { if (keyName(event) === 'escape') drawer.setOpen(false, 'escape-key', event) }}
-      style={{ width, height, display: 'flex', flexDirection: 'row', alignItems: isTop ? 'flex-start' : isBottom ? 'flex-end' : 'center', justifyContent: isLeft ? 'flex-start' : isRight ? 'flex-end' : 'center' }}
+      style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'row', alignItems: isTop ? 'flex-start' : isBottom ? 'flex-end' : 'center', justifyContent: isLeft ? 'flex-start' : isRight ? 'flex-end' : 'center' }}
     >
       <div
         ref={drawer.popupRef as never}
@@ -310,8 +306,9 @@ function DrawerPopup(props: { children: ReactNode; style?: Style; testId?: strin
           borderTopRightRadius: isBottom || isLeft ? 14 : 0,
           borderBottomLeftRadius: isTop || isRight ? 14 : 0,
           borderBottomRightRadius: isTop || isLeft ? 14 : 0,
-          width: isBottom || isTop ? width : Math.min(420, width * 0.4),
-          height: isBottom || isTop ? undefined : height,
+          width: isBottom || isTop ? '100%' : '40%',
+          maxWidth: isBottom || isTop ? undefined : 420,
+          height: isBottom || isTop ? undefined : '100%',
           boxShadow: { offsetX: 0, offsetY: isTop ? 10 : -10, blurRadius: 28, spreadRadius: 0, color: C.shadow },
         }, props.style)}
       >{props.children}</div>

@@ -14,7 +14,7 @@ import { FormContext as ButtonFormContext, type FormContextValue as ButtonFormCo
 type FieldApi = {
   name: string | undefined
   getValue: () => unknown
-  validate: () => Promise<string[]> | string[]
+  validate: () => Promise<string[]>
   setErrors: (errors: string[]) => void
 }
 
@@ -74,8 +74,7 @@ function FieldRoot(props: {
     defaultValue: props.defaultValue ?? '',
     onChange: (next, details) => props.onValueChange?.(next, details),
   })
-  const [touched, setTouched] = useState(props.touched ?? false)
-  const [focused, setFocused] = useState(false)
+  const [touched] = useState(props.touched ?? false)
   const [error, setError] = useState<string | null>(null)
   const controlRef = useRef<Instance | null>(null)
   const form = useContext(FormContext)
@@ -95,7 +94,7 @@ function FieldRoot(props: {
   const api = useRef<FieldApi>({
     name: props.name,
     getValue: () => value,
-    validate: () => [],
+    validate: async () => [],
     setErrors: (errors) => setError(errors[0] ?? null),
   })
   api.current.name = props.name
@@ -119,13 +118,13 @@ function FieldRoot(props: {
     touched,
     dirty,
     filled: value !== '' && value !== null && value !== undefined,
-    focused,
+    focused: false,
     invalid: Boolean(props.invalid || error),
     error,
     validate: runValidate,
     validationMode,
     controlRef,
-  }), [props.name, value, setValue, props.disabled, touched, dirty, focused, props.invalid, error, validationMode, runValidate, controlRef])
+  }), [props.name, value, setValue, props.disabled, touched, dirty, props.invalid, error, validationMode, runValidate, controlRef])
 
   return <FieldContext.Provider value={context}>
     <div testId={props.testId} style={mergeStyle({ display: 'flex', flexDirection: 'column', gap: 7, width: '100%' }, props.style)}>{props.children}</div>
@@ -188,13 +187,15 @@ function FieldControl(props: {
   const form = useContext(FormContext)
   const ref = useRef<Instance | null>(null)
   const disabled = props.disabled ?? field.disabled
+  // oxlint-disable-next-line typescript/no-base-to-string -- Field.Control retains string coercion for custom values.
+  const inputValue = String(field.value ?? '')
   return <input
     ref={(node: Instance | null) => { ref.current = node; field.controlRef.current = node }}
     testId={props.testId}
     aria-label={props.ariaLabel}
     autoFocus={props.autoFocus}
     tabIndex={props.tabIndex ?? (disabled ? -1 : 0)}
-    value={field.value === undefined || field.value === null ? '' : String(field.value)}
+    value={inputValue}
     placeholder={props.placeholder}
     readOnly={disabled || props.readOnly}
     onSubmit={() => { form?.submit() }}
@@ -284,7 +285,7 @@ function FormRoot(props: {
   const validationMode = props.validationMode ?? 'onSubmit'
 
   const validateAll = async () => {
-    const result = await Promise.all(Array.from(fields.current.values()).map((field) => field.current.validate()))
+    const result = await Promise.all(Array.from(fields.current.values(), (field) => field.current.validate()))
     return result.every((errors) => errors.length === 0)
   }
 
@@ -331,7 +332,7 @@ function FormRoot(props: {
 function FormSubmit(props: { children: ReactNode; style?: Style; testId?: string }) {
   const form = useContext(FormContext)
   const { tokens: C } = useTheme()
-  const { pressProps, hovered } = usePress({ onPress: () => form?.submit() })
+  const { pressProps } = usePress({ onPress: () => form?.submit() })
   return <div {...pressProps} testId={props.testId} style={mergeStyle({ alignSelf: 'flex-start', height: 36, display: 'flex', alignItems: 'center', paddingLeft: 14, paddingRight: 14, borderRadius: 8, borderWidth: 1, borderColor: C.primary, backgroundColor: C.primary, cursor: 'pointer' }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 13, fontWeight: 700, color: C.primaryForeground }}>{props.children}</text>
   </div>
@@ -530,7 +531,7 @@ function StepperButton(props: { direction: 1 | -1; children: ReactNode; testId?:
   const stop = () => { if (timer.current) { clearInterval(timer.current); timer.current = null } }
   useEffect(() => stop, [])
   const disabled = field.disabled || field.readOnly
-  const { pressProps, hovered } = usePress({
+  const { pressProps } = usePress({
     disabled,
     onPress: () => field.stepBy(props.direction, props.direction === 1 ? 'increment-press' : 'decrement-press'),
   })
@@ -868,7 +869,7 @@ export function CheckboxRoot(props: {
     if (group && itemValue) group.toggle(itemValue, !state.checked)
     else setOwn(!state.checked, 'trigger-press', event)
   }
-  const { pressProps, hovered, focused } = usePress({ disabled, focusableWhenDisabled: true, role: 'checkbox', onPress: (event) => toggle(event) })
+  const { pressProps } = usePress({ disabled, focusableWhenDisabled: true, role: 'checkbox', onPress: (event) => toggle(event) })
   const ariaProps = { 'aria-checked': state.indeterminate ? 'mixed' : state.checked }
   const boxStyle: Style = {
     width: 19,
@@ -960,7 +961,7 @@ function RadioRoot(props: { value: string | number; disabled?: boolean; label?: 
   useEffect(() => { indexRef.current = register(ref) }, [register])
   const selected = group.value === props.value
   const disabled = props.disabled ?? group.disabled
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     disabled: disabled || group.readOnly,
     focusableWhenDisabled: true,
     role: 'radio',
@@ -1033,7 +1034,7 @@ export function SwitchRoot(props: {
     onChange: (next, details) => props.onCheckedChange?.(next, details),
   })
   const disabled = props.disabled ?? false
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     disabled,
     focusableWhenDisabled: true,
     role: 'switch',

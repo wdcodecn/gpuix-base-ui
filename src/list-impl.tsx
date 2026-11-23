@@ -1,8 +1,22 @@
-import { type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Badge, useTheme } from './index-internal'
 
 type Style = Record<string, unknown>
 type ListDensity = 'compact' | 'comfortable'
+
+export type ListVirtualProps<T> = {
+  data: readonly T[]
+  estimatedItemHeight: number
+  overdraw?: number
+  windowSize?: number
+  safetyBuffer?: number
+  windowStep?: number
+  keyExtractor: (item: T, index: number) => string
+  renderItem: (item: T, index: number) => ReactNode
+  empty?: ReactNode
+  style?: Style
+  onWindowChange?: (range: { start: number; end: number }) => void
+}
 
 function ListRoot({ children, style }: { children: ReactNode; style?: Style }) {
   const { tokens: C } = useTheme()
@@ -36,13 +50,103 @@ function ListItemLeading({ children, tone = 'neutral' }: { children: ReactNode; 
 function ListItemContent({ children }: { children: ReactNode }) { return <div style={{ height: 42, maxHeight: 42, flexGrow: 1, flexShrink: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 3 }}>{children}</div> }
 function ListItemTitle({ children }: { children: ReactNode }) { const { tokens: C } = useTheme(); return <text style={{ height: 19, maxHeight: 19, fontSize: 13, fontWeight: 700, color: C.text, textAlign: 'left', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineClamp: 1 }}>{children}</text> }
 function ListItemDescription({ children }: { children: ReactNode }) { const { tokens: C } = useTheme(); return <text style={{ height: 16, maxHeight: 16, fontSize: 11, color: C.muted, textAlign: 'left', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineClamp: 1 }}>{children}</text> }
-function ListItemMeta({ children, align = 'end' }: { children: ReactNode; align?: 'start' | 'end' }) { const { tokens: C } = useTheme(); return <div style={{ width: 170, minWidth: 170, height: 30, maxHeight: 30, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, overflow: 'hidden', whiteSpace: 'nowrap' }}>{children ?? <text style={{ color: C.faint }}>—</text>}</div> }
+function ListItemMeta({ children }: { children: ReactNode; align?: 'start' | 'end' }) { const { tokens: C } = useTheme(); return <div style={{ width: 170, minWidth: 170, height: 30, maxHeight: 30, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, overflow: 'hidden', whiteSpace: 'nowrap' }}>{children ?? <text style={{ color: C.faint }}>—</text>}</div> }
 function ListItemActions({ children }: { children: ReactNode }) { return <div style={{ width: 102, minWidth: 102, height: 30, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, overflow: 'hidden' }}>{children}</div> }
 function ListSeparator() { const { tokens: C } = useTheme(); return <div role="separator" style={{ height: 1, flexShrink: 0, backgroundColor: C.border }} /> }
 function ListSection({ title, children }: { title: string; children: ReactNode }) { const { tokens: C } = useTheme(); return <div style={{ display: 'flex', flexDirection: 'column' }}><text style={{ minHeight: 30, display: 'flex', alignItems: 'center', paddingLeft: 14, backgroundColor: C.control, fontSize: 11, fontWeight: 800, color: C.muted }}>{title}</text>{children}</div> }
 function ListEmpty({ title = '暂无数据', description, action }: { title?: string; description?: string; action?: ReactNode }) { const { tokens: C } = useTheme(); return <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingTop: 46, paddingBottom: 46 }}><text style={{ fontSize: 14, fontWeight: 800, color: C.text }}>{title}</text>{description ? <text style={{ fontSize: 11, color: C.muted }}>{description}</text> : null}{action}</div> }
 function ListLoading({ label = '正在加载…' }: { label?: string }) { const { tokens: C } = useTheme(); return <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingTop: 32, paddingBottom: 32 }}><div style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: C.primary }} /><text style={{ fontSize: 12, color: C.muted }}>{label}</text></div> }
 
-export const List = Object.assign(ListRoot, { Root: ListRoot, Header: ListHeader, Toolbar: ListToolbar, Item: ListItem, ItemLeading: ListItemLeading, ItemContent: ListItemContent, ItemTitle: ListItemTitle, ItemDescription: ListItemDescription, ItemMeta: ListItemMeta, ItemActions: ListItemActions, Section: ListSection, Separator: ListSeparator, Empty: ListEmpty, Loading: ListLoading })
+/**
+ * Buffered virtual list wrapper over GPUIX `<virtual-list>`.
+ * Keeps a stable safety band around the visible range so inertia scrolling
+ * does not churn React mounts on every crossed row.
+ */
+function ListVirtual<T>({
+  data,
+  estimatedItemHeight,
+  overdraw = 360,
+  windowSize = 100,
+  safetyBuffer = 24,
+  windowStep = 8,
+  keyExtractor,
+  renderItem,
+  empty,
+  style,
+  onWindowChange,
+}: ListVirtualProps<T>) {
+  const [windowStart, setWindowStart] = useState(0)
+  const windowStartRef = useRef(0)
+  const maxStart = Math.max(0, data.length - windowSize)
+  const clampedStart = Math.min(windowStart, maxStart)
+  const end = Math.min(data.length, clampedStart + windowSize)
+
+  useEffect(() => {
+    windowStartRef.current = clampedStart
+    if (clampedStart !== windowStart) {
+      setWindowStart(clampedStart)
+    }
+  }, [clampedStart, windowStart])
+
+  useEffect(() => {
+    onWindowChange?.({ start: clampedStart, end })
+  }, [clampedStart, end, onWindowChange])
+
+  const onVisibleRange = useCallback((event: { startIndex?: number; endIndex?: number }) => {
+    const start = Math.max(0, Math.floor(event.startIndex ?? 0))
+    const endIndex = Math.max(start + 1, Math.ceil(event.endIndex ?? start + 1))
+    const current = windowStartRef.current
+    const currentEnd = Math.min(data.length, current + windowSize)
+    const safelyBuffered = start >= current + safetyBuffer && endIndex <= currentEnd - safetyBuffer
+    if (safelyBuffered) return
+    const jumpedOutsideWindow = start < current || endIndex > currentEnd
+    const next = jumpedOutsideWindow
+      ? Math.max(0, Math.min(maxStart, Math.floor(start - windowSize / 2)))
+      : start < current + safetyBuffer
+        ? Math.max(0, current - windowStep)
+        : Math.min(maxStart, current + windowStep)
+    if (next === current) return
+    windowStartRef.current = next
+    setWindowStart(next)
+  }, [data.length, maxStart, safetyBuffer, windowSize, windowStep])
+
+  if (data.length === 0) {
+    return <>{empty ?? <ListEmpty />}</>
+  }
+
+  return <virtual-list
+    itemCount={data.length}
+    windowStart={clampedStart}
+    estimatedItemHeight={estimatedItemHeight}
+    overdraw={overdraw}
+    style={{ flexGrow: 1, minHeight: 0, ...style }}
+    onVisibleRange={onVisibleRange}
+  >
+    {data.slice(clampedStart, end).map((item, offset) => {
+      const index = clampedStart + offset
+      return <div key={keyExtractor(item, index)} style={{ width: '100%' }}>
+        {renderItem(item, index)}
+      </div>
+    })}
+  </virtual-list>
+}
+
+export const List = Object.assign(ListRoot, {
+  Root: ListRoot,
+  Header: ListHeader,
+  Toolbar: ListToolbar,
+  Item: ListItem,
+  ItemLeading: ListItemLeading,
+  ItemContent: ListItemContent,
+  ItemTitle: ListItemTitle,
+  ItemDescription: ListItemDescription,
+  ItemMeta: ListItemMeta,
+  ItemActions: ListItemActions,
+  Section: ListSection,
+  Separator: ListSeparator,
+  Empty: ListEmpty,
+  Loading: ListLoading,
+  Virtual: ListVirtual,
+})
 
 export type { ListDensity }

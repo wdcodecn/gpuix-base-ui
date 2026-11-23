@@ -117,7 +117,7 @@ function RadioSwitchDemo() {
 function FormDemo() {
   return <div style={{ width: 260 }}>
     <Form onFormSubmit={() => undefined} testId="gallery-form">
-      <Field.Root name="host" validate={(value) => String(value ?? '').length < 3 ? '至少 3 个字符' : null} validationMode="onSubmit">
+      <Field.Root name="host" validate={(value) => typeof value === 'string' && value.length >= 3 ? null : '至少 3 个字符'} validationMode="onSubmit">
         <Field.Label>服务器地址</Field.Label>
         <Field.Control placeholder="example.com" testId="gallery-field-host" />
         <Field.Description>用于订阅更新的来源地址</Field.Description>

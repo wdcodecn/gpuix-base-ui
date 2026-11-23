@@ -1,13 +1,12 @@
 import {
   createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react'
-import { useGpuix } from '@gpuix/react'
 import type { EventPayload } from '@gpuix/native'
 import type { PublicInstance as Instance } from '@gpuix/react'
 import { useTheme } from '../theme-context'
 import {
-  clamp, keyName, mergeStyle, useAnchoredPosition, useControllableState, useDismiss, usePress, useReturnFocus, useTypeahead,
-  type ChangeDetails, type ElementRef, type OpenReason, type Style,
+  keyName, mergeStyle, useAnchoredPosition, useControllableState, useDismiss, usePress, useReturnFocus,
+  type ChangeDetails, type OpenReason, type Style,
 } from './foundations'
 import { menuItemStyle, popupListStyle, useItemCollection, useItemRegistration, useListNavigation } from './surface'
 import { Chevron } from './chevron'
@@ -118,7 +117,7 @@ function SelectTrigger(props: { children: ReactNode; style?: Style; testId?: str
   const { tokens: C } = useTheme()
   const select = useSelect('Select.Trigger')
   const disabled = props.disabled ?? select.disabled
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     disabled,
     focusableWhenDisabled: true,
     onPress: () => { if (!select.readOnly) select.setOpen(!select.open, 'trigger-press') },
@@ -296,7 +295,7 @@ function SelectSeparator() {
   const { tokens: C } = useTheme()
   return <div role="separator" style={{ height: 1, marginTop: 3, marginBottom: 3, backgroundColor: C.border }} />
 }
-function SelectScrollArrow(props: { direction?: 'up' | 'down'; keepMounted?: boolean; children?: ReactNode }) { return null }
+function SelectScrollArrow(_props: { direction?: 'up' | 'down'; keepMounted?: boolean; children?: ReactNode }) { return null }
 
 export const Select = Object.assign(SelectRoot, {
   Root: SelectRoot,
@@ -451,7 +450,7 @@ function FilterableLabel(props: { children: ReactNode; style?: Style }) {
 function FilterableInputGroup(props: { children: ReactNode; style?: Style }) {
   const { tokens: C } = useTheme()
   const filterable = useFilterable('InputGroup')
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     disabled: filterable.disabled,
     focusableWhenDisabled: true,
     onPress: () => { if (filterable.openOnInputClick && !filterable.readOnly) filterable.setOpen(true, 'trigger-press') },
@@ -562,7 +561,7 @@ function FilterableIcon(props: { children?: ReactNode }) {
 function FilterableClear(props: { children?: ReactNode; keepMounted?: boolean; testId?: string }) {
   const { tokens: C } = useTheme()
   const filterable = useFilterable('Clear')
-  const { pressProps, hovered } = usePress({
+  const { pressProps } = usePress({
     disabled: filterable.disabled || filterable.readOnly,
     onPress: (event) => { filterable.setValue([], 'input-clear', event); filterable.setQuery('', event) },
   })
@@ -595,7 +594,7 @@ function FilterableChips(props: { children?: ReactNode; style?: Style }) {
 
 function FilterableChip(props: { value: string; children?: ReactNode; style?: Style }) {
   const { tokens: C } = useTheme()
-  const filterable = useFilterable('Chip')
+  useFilterable('Chip')
   return <div style={mergeStyle({ height: 24, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 8, paddingRight: 4, borderRadius: 6, backgroundColor: C.selected, borderWidth: 1, borderColor: `${C.violet}55` }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 11, fontWeight: 600, color: C.selectedForeground }}>{props.children ?? props.value}</text>
     <FilterableChipRemove value={props.value} />
@@ -605,7 +604,7 @@ function FilterableChip(props: { value: string; children?: ReactNode; style?: St
 function FilterableChipRemove(props: { value: string; children?: ReactNode; testId?: string }) {
   const { tokens: C } = useTheme()
   const filterable = useFilterable('ChipRemove')
-  const { pressProps, hovered } = usePress({
+  const { pressProps } = usePress({
     disabled: filterable.disabled || filterable.readOnly,
     onPress: (event) => filterable.setValue(filterable.value.filter((entry) => entry !== props.value), 'input-clear', event),
   })
@@ -825,7 +824,7 @@ function NavigationMenuTrigger(props: { children: ReactNode; value?: string; dis
   const clear = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null } }
   useEffect(() => clear, [])
   const active = menu.value === itemValue
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     disabled: props.disabled,
     focusableWhenDisabled: true,
     onPress: () => menu.setValue(active ? null : itemValue, 'trigger-press'),
@@ -898,7 +897,7 @@ function NavigationMenuContent(props: { value?: string; children: ReactNode; sty
 function NavigationMenuLink(props: { children: ReactNode; active?: boolean; closeOnClick?: boolean; onClick?: () => void; style?: Style; testId?: string }) {
   const { tokens: C } = useTheme()
   const menu = useNavigationMenu('NavigationMenu.Link')
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     onPress: () => { props.onClick?.(); if (props.closeOnClick !== false) menu.setValue(null, 'item-press') },
   })
   return <div

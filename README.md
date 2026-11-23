@@ -77,9 +77,12 @@ replace `ThemeTokens` with a product-specific visual system.
 
 ```sh
 bun install
-bun run typecheck
+bun run check
 bun run dev
 ```
+
+For a quick lint and type pass, run `bun run lint --type-aware --type-check`
+with Oxlint and tsrs. `bun run check` also runs the TypeScript compiler used by CI.
 
 The playground contains nine product-style pages plus an interactive component
 gallery. The proxy page exercises a 5,000-row native virtual list with a
@@ -87,12 +90,14 @@ gallery. The proxy page exercises a 5,000-row native virtual list with a
 
 ## Android companion
 
-The Android runtime, standalone Hermes host and APK/AAB CLI live in
-[`wdcodecn/gpuix-android`](https://github.com/wdcodecn/gpuix-android). A runnable
-example lives in
-[`wdcodecn/gpuix-app-starter`](https://github.com/wdcodecn/gpuix-app-starter).
-This repository remains focused on component source, theme contracts and
-interaction semantics.
+Use the sibling [`gpuix-android`](https://github.com/wdcodecn/gpuix-android)
+checkout to run this nine-page playground on an Android device. Run `init`
+once to generate the host for `playground.tsx`.
+
+```sh
+bun ../gpuix-android/scripts/gpuix.ts init --entry playground.tsx --app-id dev.gpuix.baseui --name "GPUIX Base UI"
+bun ../gpuix-android/scripts/gpuix.ts run DEVICE_SERIAL
+```
 
 ## License
 

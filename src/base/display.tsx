@@ -2,10 +2,10 @@ import {
   createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore,
   type ReactNode, type RefObject,
 } from 'react'
-import { useGpuix, useWindowSize } from '@gpuix/react'
+import { useGpuix } from '@gpuix/react'
 import type { EventPayload } from '@gpuix/native'
 import type { PublicInstance as Instance } from '@gpuix/react'
-import { useTheme, type ThemeTokens } from '../theme-context'
+import { useTheme } from '../theme-context'
 import {
   clamp, formatNumber, mergeStyle, ratioOf, useBounds, useControllableState, usePress, useRovingFocus,
   type ChangeDetails, type Style,
@@ -75,7 +75,7 @@ function AccordionTrigger(props: { children: ReactNode; style?: Style; testId?: 
   const root = useContext(AccordionContext)
   const item = useContext(AccordionItemContext)
   if (!root || !item) throw new Error('Accordion.Trigger must be used inside Accordion.Item')
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     disabled: item.disabled,
     focusableWhenDisabled: true,
     onPress: () => root.toggle(item.value),
@@ -205,7 +205,7 @@ type ValueContextValue = {
 const MeterContext = createContext<ValueContextValue | null>(null)
 const ProgressContext = createContext<ValueContextValue | null>(null)
 
-function useValueContext(context: typeof MeterContext | typeof ProgressContext, name: string) {
+function useValueContext(context: typeof MeterContext, name: string) {
   const value = useContext(context)
   if (!value) throw new Error(`${name} must be used inside its Root`)
   return value
@@ -423,7 +423,7 @@ function TabsTab(props: { value: string | number; disabled?: boolean; children: 
     indexRef.current = register(ref)
   }, [setRef, props.value, register])
   const active = context.value === props.value
-  const { pressProps, hovered, focused } = usePress({
+  const { pressProps } = usePress({
     disabled: props.disabled,
     onPress: () => context.setValue(props.value, 'trigger-press'),
     onKeyDown: (event) => keyDownFor(indexRef.current)(event),
@@ -593,7 +593,6 @@ function ScrollAreaThumb(props: { style?: Style }) {
   const maxScroll = Math.max(1, contentHeight - viewportHeight)
   const position = contentHeight > 0 ? clamp(scrollTop / maxScroll, 0, 1) : 0
   const dragRef = useRef<{ startY: number; startTop: number } | null>(null)
-  const { renderer } = useGpuix()
   const onMouseDown = (event: EventPayload) => { dragRef.current = { startY: event.y ?? 0, startTop: context.metrics.scrollTop } }
   const onMouseMove = (event: EventPayload) => {
     const drag = dragRef.current
@@ -776,10 +775,6 @@ function ToastPortal(props: { children: ReactNode }) {
 
 function ToastViewport(props: { children?: ReactNode; style?: Style; testId?: string }) {
   const toasts = useToastList()
-  // Hooks must be called in the same order on the empty and populated states.
-  // Calling useWindowSize only after the first toast is added makes React throw
-  // "Rendered more hooks than during the previous render" on the first click.
-  const { width, height } = useWindowSize()
   // An empty full-window anchored layer is not visually inert in every native
   // backend: GPUI may allocate it as an opaque high-priority surface and hide
   // the page underneath. Mount the viewport only while there is a toast to
@@ -788,7 +783,7 @@ function ToastViewport(props: { children?: ReactNode; style?: Style; testId?: st
   const expanded = toasts.length > 0
   const ariaProps = { 'aria-live': 'polite' as const, 'aria-atomic': false }
   const dataProps = { 'data-expanded': expanded }
-  return <anchored position={{ x: 0, y: 0 }} priority={5} style={{ pointerEvents: 'none' }}>
+  return <anchored fill="window" priority={5} style={{ backgroundColor: 'transparent', pointerEvents: 'none' }}>
     <div
       {...ariaProps}
       {...dataProps}
@@ -796,8 +791,8 @@ function ToastViewport(props: { children?: ReactNode; style?: Style; testId?: st
       aria-label="Notifications"
       testId={props.testId}
       style={mergeStyle({
-        width,
-        height,
+        width: '100%',
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
@@ -862,7 +857,7 @@ function ToastDescription(props: { children?: ReactNode; style?: Style }) {
 
 function ToastAction(props: { children: ReactNode; onClick?: () => void; style?: Style; testId?: string }) {
   const item = useContext(ToastItemContext)
-  const { pressProps, hovered } = usePress({ onPress: () => { props.onClick?.(); item?.close() } })
+  const { pressProps } = usePress({ onPress: () => { props.onClick?.(); item?.close() } })
   const { tokens: C } = useTheme()
   return <div {...pressProps} testId={props.testId} style={mergeStyle({ alignSelf: 'flex-start', minHeight: 28, display: 'flex', alignItems: 'center', paddingLeft: 10, paddingRight: 10, borderRadius: 6, borderWidth: 1, borderColor: C.borderStrong, backgroundColor: C.control, cursor: 'pointer' }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 12, fontWeight: 700, color: C.text }}>{props.children}</text>
@@ -872,7 +867,7 @@ function ToastAction(props: { children: ReactNode; onClick?: () => void; style?:
 function ToastClose(props: { children?: ReactNode; style?: Style; testId?: string }) {
   const { tokens: C } = useTheme()
   const item = useContext(ToastItemContext)
-  const { pressProps, hovered } = usePress({ onPress: () => item?.close(), role: 'button' })
+  const { pressProps } = usePress({ onPress: () => item?.close(), role: 'button' })
   return <div {...pressProps} aria-label="Close" testId={props.testId} style={mergeStyle({ position: 'absolute', top: 8, right: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: 'transparent', cursor: 'pointer' }, props.style)}>
     <text style={{ fontFamily: 'Helvetica', fontSize: 14, color: C.muted }}>{props.children ?? '×'}</text>
   </div>

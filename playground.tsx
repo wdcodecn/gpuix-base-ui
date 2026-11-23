@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { render, useGpuix, useWindowInsets, useWindowSize } from '@gpuix/react'
+import { render, useGpuix } from '@gpuix/react'
 import type { DebugFrameOverlayMode, DebugFrameOverlayStats, NativeRenderer } from '@gpuix/react'
 import { Badge, Button, Card, Glyph, IconButton, Input, List, Select, Switch, Tabs, ThemeProvider, useTheme, type ThemeMode } from './src'
+import { useViewportInsets, useViewportSize } from './src/base/foundations'
 import { Gallery } from './gallery'
 
 type PageId = 'home' | 'proxies' | 'subscriptions' | 'connections' | 'rules' | 'logs' | 'tests' | 'components' | 'settings'
@@ -23,10 +24,9 @@ const TITLES: Record<PageId, string> = {
 }
 
 function useResponsiveViewport() {
-  // Window/inset geometry changes only on rotation, resize or IME animation;
-  // sampling at 250ms avoids several duplicate 100ms timers across the shell
-  // and active page without making rotation visibly lag.
-  const size = useWindowSize({ intervalMs: 250 })
+  // Uses native viewport push events when available (0 timer wakeups on mobile)
+  // and shares a single 250ms observer across callers on desktop.
+  const size = useViewportSize({ intervalMs: 250 })
   const landscape = size.width > size.height
   // Phones in landscape often report a wide logical width but a very short
   // height. Keep the mobile shell in that case so we do not switch to the
@@ -131,7 +131,7 @@ function usePerformanceDebug() {
   return { open, setOpen, overlay, snapshot, toggleOverlay, resetStats }
 }
 
-function PerformanceDebugButton({ compact, snapshot, open, onToggle }: { compact?: boolean; snapshot: PerformanceSnapshot; open: boolean; onToggle: () => void }) {
+function PerformanceDebugButton({ compact, snapshot, onToggle }: { compact?: boolean; snapshot: PerformanceSnapshot; onToggle: () => void }) {
   return <Button size="sm" variant="secondary" aria-label="打开渲染诊断" onClick={onToggle}>{compact ? `帧 ${snapshot.gpuFps || '--'}` : `性能 ${snapshot.gpuFps || '--'} fps`}</Button>
 }
 
@@ -166,36 +166,48 @@ function NavItem({ active, label, icon, onClick }: { active: boolean; label: str
   return <Button testId={`nav-${label}`} width="100%" justify="start" variant={active ? 'primary' : 'ghost'} onClick={onClick} icon={icon}>{label}</Button>
 }
 
-function PageContent({ page, onNavigate }: { page: PageId; onNavigate: (page: PageId) => void }) {
+function PageContent({ page, onNavigate, refreshRateSetting, portraitPhone }: {
+  page: PageId
+  onNavigate: (page: PageId) => void
+  refreshRateSetting: RefreshRateSettingProps
+  portraitPhone: boolean
+}) {
   const { mode, setMode } = useTheme()
-  if (page === 'home') return <Home onNavigate={onNavigate} />
-  if (page === 'proxies') return <Proxies />
+  if (page === 'home') return <Home onNavigate={onNavigate} stacked={portraitPhone} />
+  if (page === 'proxies') return <Proxies mobile={portraitPhone} />
   if (page === 'subscriptions') return <Subscriptions />
   if (page === 'connections') return <Connections />
   if (page === 'components') return <Gallery />
-  if (page === 'settings') return <Settings mode={mode} setMode={setMode} />
+  if (page === 'settings') return <Settings mode={mode} setMode={setMode} refreshRateSetting={refreshRateSetting} stacked={portraitPhone} />
   return <Placeholder page={page} />
 }
 
 function Shell() {
   const [page, setPage] = useState<PageId>('home')
+  const [refreshRatePreference, setRefreshRatePreference] = useState<RefreshRatePreference>({
+    enabled: true,
+    rate: DEFAULT_INTERACTION_REFRESH_RATE,
+  })
+  const refreshRateSetting = { value: refreshRatePreference, onChange: setRefreshRatePreference }
   const { tokens: C, mode, setMode } = useTheme()
   const { width, mobile, compact: landscapeCompact } = useResponsiveViewport()
-  const insets = useWindowInsets({ intervalMs: 250 })
+  const insets = useViewportInsets({ intervalMs: 250 })
   const performance = usePerformanceDebug()
   const compact = width < 1180
+  const usesVirtualList = page === 'proxies'
   if (mobile) return <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', paddingTop: insets.effective.top, paddingBottom: insets.effective.bottom, paddingLeft: insets.effective.left, paddingRight: insets.effective.right, backgroundColor: C.canvas, color: C.text, fontFamily: 'sans-serif' }}>
     <div style={{ height: landscapeCompact ? 44 : 56, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', paddingLeft: landscapeCompact ? 10 : 16, paddingRight: landscapeCompact ? 10 : 16, gap: landscapeCompact ? 7 : 10, backgroundColor: C.panel }}>
       <text style={{ flexGrow: 1, fontSize: 20, fontWeight: 800, color: C.text }}>{TITLES[page]}</text>
       <Badge tone="info">GPUIX</Badge>
-      <PerformanceDebugButton compact={landscapeCompact} snapshot={performance.snapshot} open={performance.open} onToggle={() => performance.setOpen((value) => !value)} />
+      <PerformanceDebugButton compact={landscapeCompact} snapshot={performance.snapshot} onToggle={() => performance.setOpen((value) => !value)} />
       <Button testId="mobile-theme" size="sm" variant="secondary" style={{ height: landscapeCompact ? 36 : 42, minWidth: landscapeCompact ? 58 : 68 }} onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}>{mode === 'light' ? '深色' : '浅色'}</Button>
     </div>
     <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', padding: landscapeCompact ? 5 : 8, gap: landscapeCompact ? 3 : 4, backgroundColor: C.panel, borderBottomWidth: 1, borderColor: C.border }}>
       {[NAV.slice(0, 4), NAV.slice(4)].map((items, row) => <div key={row} style={{ display: 'flex', flexDirection: 'row', gap: landscapeCompact ? 3 : 4 }}>{items.map((item) => <Button key={item.id} testId={`nav-${item.label}`} variant={page === item.id ? 'primary' : 'ghost'} style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, height: landscapeCompact ? 34 : 42, paddingLeft: 4, paddingRight: 4, minHeight: landscapeCompact ? 34 : 42 }} onClick={() => setPage(item.id)}>{item.label}</Button>)}</div>)}
     </div>
-    <div style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: page === 'proxies' ? 'hidden' : 'scroll', flexBasis: 0, padding: landscapeCompact ? 8 : 10 }}>
-      <div key={page} style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, minWidth: 0 }}><PageContent page={page} onNavigate={setPage} /></div>
+    <div style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: usesVirtualList ? 'hidden' : 'scroll', flexBasis: 0, padding: landscapeCompact ? 8 : 10 }}>
+      {/* The scroll viewport measures this child to determine its scroll range. */}
+      <div key={page} style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexShrink: usesVirtualList ? 1 : 0, minHeight: 0, minWidth: 0 }}><PageContent page={page} onNavigate={setPage} refreshRateSetting={refreshRateSetting} portraitPhone={!landscapeCompact} /></div>
     </div>
     {performance.open && <PerformanceDebugPanel compact={landscapeCompact} top={insets.effective.top + (landscapeCompact ? 52 : 64)} snapshot={performance.snapshot} overlay={performance.overlay} onToggleOverlay={performance.toggleOverlay} onReset={performance.resetStats} />}
   </div>
@@ -217,20 +229,18 @@ function Shell() {
     <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ height: 66, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 25, paddingRight: 25, backgroundColor: C.panel, borderBottomWidth: 1, borderColor: C.border }}>
         <text style={{ fontSize: 21, fontWeight: 800, color: C.text }}>{TITLES[page]}</text><div style={{ flexGrow: 1 }} />
-        <Badge tone="info">GPUIX native</Badge><PerformanceDebugButton snapshot={performance.snapshot} open={performance.open} onToggle={() => performance.setOpen((value) => !value)} /><IconButton label="帮助">?</IconButton><IconButton label="更多">•••</IconButton>
+        <Badge tone="info">GPUIX native</Badge><PerformanceDebugButton snapshot={performance.snapshot} onToggle={() => performance.setOpen((value) => !value)} /><IconButton label="帮助">?</IconButton><IconButton label="更多">•••</IconButton>
       </div>
       <div style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'scroll', flexBasis: 0, padding: 22 }}>
-        <div key={page} style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, minWidth: 0 }}><PageContent page={page} onNavigate={setPage} /></div>
+        <div key={page} style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, minWidth: 0 }}><PageContent page={page} onNavigate={setPage} refreshRateSetting={refreshRateSetting} portraitPhone={false} /></div>
       </div>
       {performance.open && <PerformanceDebugPanel top={insets.effective.top + 74} snapshot={performance.snapshot} overlay={performance.overlay} onToggleOverlay={performance.toggleOverlay} onReset={performance.resetStats} />}
     </div>
   </div>
 }
 
-function Home({ onNavigate }: { onNavigate: (page: PageId) => void }) {
+function Home({ onNavigate, stacked }: { onNavigate: (page: PageId) => void; stacked: boolean }) {
   const { tokens: C } = useTheme()
-  const { mobile, landscape } = useResponsiveViewport()
-  const stacked = mobile && !landscape
   const [node, setNode] = useState(NODES[1].name)
   const [tun, setTun] = useState(true)
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -250,22 +260,6 @@ function Metric({ label, value, unit, tone, dense = false }: { label: string; va
   const { tokens: C } = useTheme()
   const color = tone === 'warning' ? C.orange : tone === 'info' ? C.violet : C.green
   return <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: dense ? 1 : 5, padding: dense ? 5 : 14, borderRadius: 9, backgroundColor: C.panelRaised, borderWidth: 1, borderColor: C.border }}><text style={{ fontSize: dense ? 8 : 11, whiteSpace: 'nowrap', color: C.muted }}>{label}</text><div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: dense ? 2 : 5 }}><text style={{ fontSize: dense ? 15 : 21, fontWeight: 800, color: C.text }}>{value}</text><text style={{ fontSize: dense ? 8 : 11, color }}>{unit}</text></div></div>
-}
-
-function ProxiesLegacy() {
-  const { tokens: C } = useTheme()
-  const [selected, setSelected] = useState(PROXY_ROWS[1].id)
-  const [query, setQuery] = useState('')
-  const [windowStart, setWindowStart] = useState(0)
-  const filteredRows = query ? PROXY_ROWS.filter((row) => row.name.toLowerCase().includes(query.toLowerCase()) || row.protocol.toLowerCase().includes(query.toLowerCase())) : PROXY_ROWS
-  const windowSize = 100
-  const maxStart = Math.max(0, filteredRows.length - windowSize)
-  const end = Math.min(filteredRows.length, windowStart + windowSize)
-  const onVisibleRange = (event: { startIndex?: number }) => {
-    const next = Math.max(0, Math.min(maxStart, Math.floor((event.startIndex ?? 0) - 25)))
-    if (next !== windowStart) setWindowStart(next)
-  }
-  return <List.Root style={{ height: '100%' }}><List.Header title="GPUIX · 代理节点" description="GPUIX virtual-list · 只挂载当前窗口，滚动时由原生列表接管" count={`${filteredRows.length.toLocaleString()} 个节点`} action={<div style={{ display: 'flex', flexDirection: 'row', gap: 7 }}><Badge tone="success">96 在线</Badge><Button size="sm" variant="secondary">批量测速</Button></div>} /><List.Toolbar><div style={{ width: 260 }}><Input value={query} placeholder="搜索节点或协议" onChange={(value) => { setQuery(value); setWindowStart(0) }} testId="proxy-search" /></div><Badge tone="info">窗口 {filteredRows.length === 0 ? 0 : windowStart + 1}–{end}</Badge><text style={{ fontSize: 11, color: C.muted }}>100 行窗口 · 原生滚轮惯性</text><div style={{ flexGrow: 1 }} /><Button size="sm" variant="ghost">规则</Button><Button size="sm" variant="ghost">全局</Button><Button size="sm" variant="ghost">直连</Button></List.Toolbar>{filteredRows.length === 0 ? <List.Empty title="没有匹配的节点" description="换一个关键词再试试" /> : <virtual-list itemCount={filteredRows.length} windowStart={windowStart} estimatedItemHeight={68} overdraw={360} style={{ flexGrow: 1, minHeight: 0 }} onVisibleRange={onVisibleRange}>{filteredRows.slice(windowStart, end).map((node) => <List.Item key={node.id} testId={`proxy-${node.id}`} selected={selected === node.id} onClick={() => setSelected(node.id)}><List.ItemLeading tone={node.latency < 150 ? 'success' : node.latency < 260 ? 'info' : 'warning'}>{node.flag}</List.ItemLeading><List.ItemContent><List.ItemTitle>{node.name}</List.ItemTitle><List.ItemDescription>{node.protocol} · UDP · {node.location} · TLS ready</List.ItemDescription></List.ItemContent><List.ItemMeta><text style={{ fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', color: node.latency < 150 ? C.green : node.latency < 260 ? C.violet : C.orange }}>{node.latency} ms</text><Badge tone={selected === node.id ? 'info' : 'neutral'}>{selected === node.id ? '当前节点' : '可用'}</Badge></List.ItemMeta><List.ItemActions><Button size="sm" variant={selected === node.id ? 'primary' : 'secondary'} onClick={() => setSelected(node.id)}>{selected === node.id ? '已选择' : '选择'}</Button><Button size="sm" variant="ghost">•••</Button></List.ItemActions></List.Item>)}</virtual-list>}</List.Root>
 }
 
 const ProxyRow = memo(function ProxyRow({ node, selected, onSelect, mobile = false }: { node: typeof PROXY_ROWS[number]; selected: boolean; onSelect: (id: string) => void; mobile?: boolean }) {
@@ -289,53 +283,34 @@ const ProxyRow = memo(function ProxyRow({ node, selected, onSelect, mobile = fal
   </List.Item>
 })
 
-function Proxies() {
-  const { mobile: viewportMobile, landscape } = useResponsiveViewport()
+function Proxies({ mobile }: { mobile: boolean }) {
   // Portrait phones use the two-line touch row. Landscape phones have enough
   // width for the fixed desktop columns, which keeps latency/status/actions
   // aligned vertically while still honoring the compact shell insets.
-  const mobile = viewportMobile && !landscape
   const [selected, setSelected] = useState(PROXY_ROWS[1].id)
   const [query, setQuery] = useState('')
-  const [windowStart, setWindowStart] = useState(0)
-  const windowStartRef = useRef(0)
+  const [windowRange, setWindowRange] = useState({ start: 0, end: 100 })
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return needle ? PROXY_ROWS.filter((row) => row.name.toLowerCase().includes(needle) || row.protocol.toLowerCase().includes(needle)) : PROXY_ROWS
   }, [query])
-  const windowSize = 100
-  const maxStart = Math.max(0, filteredRows.length - windowSize)
-  const end = Math.min(filteredRows.length, windowStart + windowSize)
   const selectNode = useCallback((id: string) => setSelected(id), [])
-  const resetWindow = useCallback(() => {
-    windowStartRef.current = 0
-    setWindowStart(0)
-  }, [])
-  // The native list reports its visible range continuously during inertia.
-  // Re-slicing 100 React rows for every crossed item floods the renderer and
-  // defeats virtualisation. Keep a 24-row safety band, advance a normal
-  // re-window by 8 rows, and only re-center after a real fast jump.
-  const onVisibleRange = useCallback((event: { startIndex?: number; endIndex?: number }) => {
-    const start = Math.max(0, Math.floor(event.startIndex ?? 0))
-    const endIndex = Math.max(start + 1, Math.ceil(event.endIndex ?? start + 1))
-    const current = windowStartRef.current
-    const currentEnd = Math.min(filteredRows.length, current + windowSize)
-    const safelyBuffered = start >= current + 24 && endIndex <= currentEnd - 24
-    if (safelyBuffered) return
-    const jumpedOutsideWindow = start < current || endIndex > currentEnd
-    const next = jumpedOutsideWindow
-      ? Math.max(0, Math.min(maxStart, Math.floor(start - windowSize / 2)))
-      : start < current + 24
-        ? Math.max(0, current - 8)
-        : Math.min(maxStart, current + 8)
-    if (next === current) return
-    windowStartRef.current = next
-    setWindowStart(next)
-  }, [filteredRows.length, maxStart])
+  const renderProxyRow = useCallback(
+    (node: typeof PROXY_ROWS[number]) => <ProxyRow mobile={mobile} node={node} selected={selected === node.id} onSelect={selectNode} />,
+    [mobile, selected, selectNode],
+  )
   return <List.Root style={{ height: '100%' }}>
     <List.Header title="GPUIX · 代理节点" description={mobile ? "选择当前使用的节点" : "GPUIX virtual-list · 只挂载当前窗口，滚动时由原生列表接管"} count={`${filteredRows.length.toLocaleString()} 个节点`} action={mobile ? undefined : <><Badge tone="success">96 在线</Badge><Button size="sm" variant="secondary">批量测速</Button></>} />
-    <List.Toolbar><div style={{ width: mobile ? undefined : 240, flexGrow: mobile ? 1 : undefined, minWidth: 0 }}><Input value={query} placeholder="搜索节点或协议" onChange={(value) => { setQuery(value); resetWindow() }} testId="proxy-search" /></div><Badge width={88} tone="info">窗口 {filteredRows.length === 0 ? 0 : windowStart + 1}–{end}</Badge>{!mobile && <text style={{ fontSize: 11, color: '#A1A1AA', whiteSpace: 'nowrap' }}>100 行窗口 · 原生滚轮惯性</text>}{!mobile && <><div style={{ flexGrow: 1 }} /><Button size="sm" variant="ghost">规则</Button></>}</List.Toolbar>
-    {filteredRows.length === 0 ? <List.Empty title="没有匹配的节点" description="换一个关键词再试试" /> : <virtual-list itemCount={filteredRows.length} windowStart={windowStart} estimatedItemHeight={mobile ? 104 : 68} overdraw={360} style={{ flexGrow: 1, minHeight: 0 }} onVisibleRange={onVisibleRange}>{filteredRows.slice(windowStart, end).map((node) => <ProxyRow mobile={mobile} key={node.id} node={node} selected={selected === node.id} onSelect={selectNode} />)}</virtual-list>}
+    <List.Toolbar><div style={{ width: mobile ? undefined : 240, flexGrow: mobile ? 1 : undefined, minWidth: 0 }}><Input value={query} placeholder="搜索节点或协议" onChange={setQuery} testId="proxy-search" /></div><Badge width={88} tone="info">窗口 {filteredRows.length === 0 ? 0 : windowRange.start + 1}–{windowRange.end}</Badge>{!mobile && <text style={{ fontSize: 11, color: '#A1A1AA', whiteSpace: 'nowrap' }}>100 行窗口 · 原生滚轮惯性</text>}{!mobile && <><div style={{ flexGrow: 1 }} /><Button size="sm" variant="ghost">规则</Button></>}</List.Toolbar>
+    <List.Virtual
+      data={filteredRows}
+      estimatedItemHeight={mobile ? 104 : 68}
+      overdraw={360}
+      keyExtractor={(node) => node.id}
+      renderItem={renderProxyRow}
+      onWindowChange={setWindowRange}
+      empty={<List.Empty title="没有匹配的节点" description="换一个关键词再试试" />}
+    />
   </List.Root>
 }
 
@@ -358,12 +333,18 @@ type RefreshRateRenderer = NativeRenderer & {
   getInteractionFrameRateCap?: () => number
 }
 
-function RefreshRateSetting() {
+const DEFAULT_INTERACTION_REFRESH_RATE = '60'
+
+type RefreshRatePreference = { enabled: boolean; rate: string }
+type RefreshRateSettingProps = {
+  value: RefreshRatePreference
+  onChange: (value: RefreshRatePreference) => void
+}
+
+function RefreshRateSetting({ value: { enabled, rate }, onChange }: RefreshRateSettingProps) {
   const { tokens: C } = useTheme()
   const { renderer } = useGpuix()
   const nativeRenderer = renderer as RefreshRateRenderer | null
-  const [enabled, setEnabled] = useState(true)
-  const [rate, setRate] = useState('60')
   const [supportedRates, setSupportedRates] = useState<number[] | null>(null)
   const [interactionCap, setInteractionCap] = useState<number | null>(null)
   const commonRates = [20, 30, 40, 50, 60, 90, 120, 144, 165]
@@ -388,18 +369,17 @@ function RefreshRateSetting() {
       // leave all common choices enabled as a non-blocking fallback.
     }
   }, [nativeRenderer])
-  const apply = useCallback((nextEnabled: boolean, nextRate: string) => {
-    nativeRenderer?.setPowerFrameRate?.(nextEnabled ? Number(nextRate) : 60)
-  }, [nativeRenderer])
+  const apply = useCallback((next: RefreshRatePreference) => {
+    nativeRenderer?.setPowerFrameRate?.(Number(next.enabled ? next.rate : DEFAULT_INTERACTION_REFRESH_RATE))
+    onChange(next)
+  }, [nativeRenderer, onChange])
   const onEnabledChange = useCallback((next: boolean) => {
-    setEnabled(next)
-    apply(next, rate)
+    apply({ enabled: next, rate })
   }, [apply, rate])
   const onRateChange = useCallback((next: string | string[] | null) => {
     const value = Array.isArray(next) ? next[0] : next
     if (!value) return
-    setRate(value)
-    apply(enabled, value)
+    apply({ enabled, rate: value })
   }, [apply, enabled])
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 9, width: '100%' }}>
     <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -407,9 +387,9 @@ function RefreshRateSetting() {
         <text style={{ fontSize: 13, fontWeight: 700 }}>交互刷新率上限</text>
         <text style={{ fontSize: 11, color: C.muted }}>滚动/动画时使用；页面静止自动省电</text>
       </div>
-      <Switch checked={enabled} onCheckedChange={onEnabledChange} ariaLabel="启用交互高刷新率" />
+      <Switch checked={enabled} onCheckedChange={onEnabledChange} ariaLabel="使用自定义交互刷新率上限" />
     </div>
-    <Select.Root value={rate} disabled={!enabled} onValueChange={onRateChange} items={options}>
+    <Select.Root value={enabled ? rate : DEFAULT_INTERACTION_REFRESH_RATE} disabled={!enabled} onValueChange={onRateChange} items={options}>
       <Select.Trigger ariaLabel="交互刷新率上限"><Select.Value /><Select.Icon /></Select.Trigger>
       <Select.Content>{options.map((item) => <Select.Item key={item.value} value={item.value} disabled={item.disabled}>{item.label}</Select.Item>)}</Select.Content>
     </Select.Root>
@@ -418,11 +398,14 @@ function RefreshRateSetting() {
   </div>
 }
 
-function Settings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: ThemeMode) => void }) {
+function Settings({ mode, setMode, refreshRateSetting, stacked }: {
+  mode: ThemeMode
+  setMode: (mode: ThemeMode) => void
+  refreshRateSetting: RefreshRateSettingProps
+  stacked: boolean
+}) {
   const { tokens: C } = useTheme()
-  const { mobile, landscape } = useResponsiveViewport()
-  const stacked = mobile && !landscape
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'stretch' }}><Card.Root><Card.Header title="性能与省电" description="待机与高刷策略" icon="◌" /><Card.Content><RefreshRateSetting /></Card.Content></Card.Root><div style={{ display: 'flex', flexDirection: stacked ? 'column' : 'row', gap: 16, alignItems: 'stretch' }}><div style={{ width: stacked ? '100%' : '50%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}><Card.Root><Card.Header title="系统设置" description="运行方式与系统集成" icon="⚙" /><Card.Content><SettingRow title="虚拟网卡模式" description="应用将通过虚拟网卡访问网络" checked /><SettingRow title="系统代理" description="将代理写入系统网络设置" /><SettingRow title="开机自启" description="登录后自动启动 GPUIX" /></Card.Content></Card.Root><Card.Root><Card.Header title="Clash 设置" description="内核和连接参数" icon="⌁" /><Card.Content><SettingRow title="统一延迟" description="使用统一延迟测试策略" checked /><SettingRow title="IPv6" description="允许 IPv6 出站连接" /><div style={{ display: 'flex', flexDirection: 'row', gap: 12 }}><div style={{ flexGrow: 1, minWidth: 0 }}><Input label="端口设置" value="7890" /></div><div style={{ flexGrow: 1, minWidth: 0 }}><Select.Root defaultValue="Info" items={[{ value: 'Info', label: 'Info' }, { value: 'Debug', label: 'Debug' }, { value: 'Warn', label: 'Warn' }]}><Select.Trigger><Select.Value /><Select.Icon /></Select.Trigger><Select.Content><Select.Item value="Info">Info</Select.Item><Select.Item value="Debug">Debug</Select.Item><Select.Item value="Warn">Warn</Select.Item></Select.Content></Select.Root></div></div></Card.Content></Card.Root></div><div style={{ width: stacked ? '100%' : '50%', minWidth: 0 }}><Card.Root><Card.Header title="界面设置" description="主题、语言与交互" icon="✦" /><Card.Content><Select.Root defaultValue="中文" items={[{ value: '中文', label: '中文' }, { value: 'English', label: 'English' }]}><Select.Trigger><Select.Value /><Select.Icon /></Select.Trigger><Select.Content><Select.Item value="中文">中文</Select.Item><Select.Item value="English">English</Select.Item></Select.Content></Select.Root><text style={{ paddingTop: 7, fontSize: 12, fontWeight: 700, color: C.muted }}>主题模式</text><Tabs value={mode} onValueChange={(next) => setMode(next as ThemeMode)}><Tabs.List><Tabs.Trigger value="light">浅色</Tabs.Trigger><Tabs.Trigger value="dark">深色</Tabs.Trigger><Tabs.Trigger value="system">系统</Tabs.Trigger></Tabs.List></Tabs><div style={{ height: 1, marginTop: 7, marginBottom: 4, backgroundColor: C.border }} /><SettingRow title="托盘点击事件" description="点击托盘显示主窗口" checked /><SettingRow title="显示动画" description="启用界面过渡效果" checked /></Card.Content></Card.Root></div></div></div>
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'stretch' }}><Card.Root><Card.Header title="性能与省电" description="待机与高刷策略" icon="◌" /><Card.Content><RefreshRateSetting {...refreshRateSetting} /></Card.Content></Card.Root><div style={{ display: 'flex', flexDirection: stacked ? 'column' : 'row', gap: 16, alignItems: 'stretch' }}><div style={{ width: stacked ? '100%' : '50%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}><Card.Root><Card.Header title="系统设置" description="运行方式与系统集成" icon="⚙" /><Card.Content><SettingRow title="虚拟网卡模式" description="应用将通过虚拟网卡访问网络" checked /><SettingRow title="系统代理" description="将代理写入系统网络设置" /><SettingRow title="开机自启" description="登录后自动启动 GPUIX" /></Card.Content></Card.Root><Card.Root><Card.Header title="Clash 设置" description="内核和连接参数" icon="⌁" /><Card.Content><SettingRow title="统一延迟" description="使用统一延迟测试策略" checked /><SettingRow title="IPv6" description="允许 IPv6 出站连接" /><div style={{ display: 'flex', flexDirection: 'row', gap: 12 }}><div style={{ flexGrow: 1, minWidth: 0 }}><Input label="端口设置" value="7890" /></div><div style={{ flexGrow: 1, minWidth: 0 }}><Select.Root defaultValue="Info" items={[{ value: 'Info', label: 'Info' }, { value: 'Debug', label: 'Debug' }, { value: 'Warn', label: 'Warn' }]}><Select.Trigger><Select.Value /><Select.Icon /></Select.Trigger><Select.Content><Select.Item value="Info">Info</Select.Item><Select.Item value="Debug">Debug</Select.Item><Select.Item value="Warn">Warn</Select.Item></Select.Content></Select.Root></div></div></Card.Content></Card.Root></div><div style={{ width: stacked ? '100%' : '50%', minWidth: 0 }}><Card.Root><Card.Header title="界面设置" description="主题、语言与交互" icon="✦" /><Card.Content><Select.Root defaultValue="中文" items={[{ value: '中文', label: '中文' }, { value: 'English', label: 'English' }]}><Select.Trigger><Select.Value /><Select.Icon /></Select.Trigger><Select.Content><Select.Item value="中文">中文</Select.Item><Select.Item value="English">English</Select.Item></Select.Content></Select.Root><text style={{ paddingTop: 7, fontSize: 12, fontWeight: 700, color: C.muted }}>主题模式</text><Tabs value={mode} onValueChange={(next) => setMode(next as ThemeMode)}><Tabs.List><Tabs.Trigger value="light">浅色</Tabs.Trigger><Tabs.Trigger value="dark">深色</Tabs.Trigger><Tabs.Trigger value="system">系统</Tabs.Trigger></Tabs.List></Tabs><div style={{ height: 1, marginTop: 7, marginBottom: 4, backgroundColor: C.border }} /><SettingRow title="托盘点击事件" description="点击托盘显示主窗口" checked /><SettingRow title="显示动画" description="启用界面过渡效果" checked /></Card.Content></Card.Root></div></div></div>
 }
 
 function SettingRow({ title, description, checked = false }: { title: string; description: string; checked?: boolean }) {

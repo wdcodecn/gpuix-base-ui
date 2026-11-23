@@ -3,7 +3,7 @@ import type { EventPayload } from '@gpuix/native'
 import { useTheme, type ThemeTokens } from '../theme-context'
 import {
   isArrowKey, keyName, mergeStyle, nextEnabledIndex, useDismiss, useTypeahead,
-  type ElementRef, type OpenReason, type Style,
+  type OpenReason, type Style,
 } from './foundations'
 
 export type CollectionItem = {
@@ -187,7 +187,7 @@ export function menuItemStyle(C: ThemeTokens, state: { highlighted?: boolean; se
   }
 }
 
-export function popupListStyle(C: ThemeTokens): Style {
+export function popupListStyle(_tokens: ThemeTokens): Style {
   return {
     display: 'flex',
     flexDirection: 'column',
