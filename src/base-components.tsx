@@ -1,7 +1,7 @@
 export { mergeClassNames, mergeProps, mergePropsN, makeEventPreventable } from './merge-props'
 export { useRender, useRenderElement, type UseRenderOptions } from './use-render'
 export { CSPProvider, DirectionProvider, useDirection, type Direction } from './base/providers'
-export type { Style } from './base/foundations'
+export { useBackHandler, type Style } from './base/foundations'
 
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './base/button'
 export { Toggle, ToggleGroup, Toolbar } from './base/controls'

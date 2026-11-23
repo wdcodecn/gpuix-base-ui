@@ -7,7 +7,7 @@ import { useTheme } from '../theme-context'
 import {
   cloneElement, isValidElement, type ReactElement } from 'react'
 import {
-  keyName, mergeStyle, useAnchoredPosition, useControllableState, useDismiss, usePress, useReturnFocus, useRovingFocus,
+  keyName, mergeStyle, useAnchoredPosition, useBackHandler, useControllableState, useDismiss, usePress, useReturnFocus, useRovingFocus,
   type ChangeDetails, type OpenReason, type Style,
 } from './foundations'
 import { menuItemStyle, popupListStyle, useItemCollection, useItemRegistration, useListNavigation } from './surface'
@@ -58,6 +58,13 @@ function OverlayRoot(props: {
     disabled: props.disabled ?? false,
   }), [open, setOpen, props.modal, props.dismissable, props.disabled])
   useReturnFocus(open, triggerRef)
+  useBackHandler(open, () => {
+    if (props.dismissable ?? true) {
+      setOpen(false, 'escape-key')
+      return true
+    }
+    return props.modal ?? false
+  })
   return <OverlayContext.Provider value={context}>{props.children}</OverlayContext.Provider>
 }
 
@@ -406,6 +413,7 @@ function PopoverPopup(props: { children: ReactNode; style?: Style; testId?: stri
     deferred
     priority={3}
     occlude
+    style={{ backgroundColor: 'transparent' }}
     {...dismissProps}
     onKeyDown={(event: EventPayload) => { if (keyName(event) === 'escape') popover.setOpen(false, 'escape-key', event) }}
   >

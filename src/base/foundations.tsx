@@ -434,3 +434,23 @@ export function nextEnabledIndex(current: number, direction: 1 | -1, count: numb
   }
   return current
 }
+
+type GpuixBackHost = {
+  onBackPressed?: (handler: () => boolean | void) => () => void
+}
+
+/**
+ * Subscribe to the platform hardware/predictive back event on Android (no-op on desktop).
+ * Return `true` to consume the event; returning `false`/`undefined` lets earlier handlers
+ * or default backgrounding run.
+ */
+export function useBackHandler(enabled: boolean, onBack: () => boolean | void) {
+  const latest = useRef(onBack)
+  latest.current = onBack
+  useEffect(() => {
+    if (!enabled) return
+    const host = Reflect.get(globalThis, 'gpuix') as GpuixBackHost | undefined
+    if (typeof host?.onBackPressed !== 'function') return
+    return host.onBackPressed(() => latest.current())
+  }, [enabled])
+}

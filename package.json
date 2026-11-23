@@ -44,7 +44,7 @@
   "scripts": {
     "dev": "bun --hot playground.tsx",
     "build": "bun build --compile playground.tsx --outfile dist/gpuix-base-ui-playground",
-    "lint": "oxlint --deny-warnings playground.tsx gallery.tsx src",
+    "lint": "oxlint --deny-warnings playground.tsx gallery.tsx native-demo.tsx src",
     "typecheck": "tsc --noEmit",
     "typecheck:tsrs": "tsrs --noEmit",
     "check": "bun run lint --type-aware --type-check && bun run typecheck"

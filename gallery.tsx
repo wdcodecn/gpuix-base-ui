@@ -445,17 +445,21 @@ export function Gallery() {
     ['more', '其他'],
   ] as const
   return <Toast.Provider timeout={4000}>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+    <div style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         {sections.map(([value, label]) => <Button key={value} size="sm" variant={section === value ? 'primary' : 'secondary'} testId={`gallery-section-${value}`} onClick={() => setSection(value)}>{label}</Button>)}
       </div>
-      {section === 'overview' && <OverviewSection />}
-      {section === 'buttons' && <ButtonsDemo />}
-      {section === 'forms' && <FormsSection />}
-      {section === 'choosers' && <ChoosersSection />}
-      {section === 'overlays' && <OverlaysSection />}
-      {section === 'display' && <DisplaySection />}
-      {section === 'more' && <MoreDemo />}
+      <div key={section} style={{ flexGrow: 1, flexBasis: 0, minHeight: 0, overflowY: 'scroll', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+          {section === 'overview' && <OverviewSection />}
+          {section === 'buttons' && <ButtonsDemo />}
+          {section === 'forms' && <FormsSection />}
+          {section === 'choosers' && <ChoosersSection />}
+          {section === 'overlays' && <OverlaysSection />}
+          {section === 'display' && <DisplaySection />}
+          {section === 'more' && <MoreDemo />}
+        </div>
+      </div>
     </div>
     <Toast.Portal><Toast.Viewport testId="gallery-toast-viewport"><ToastList /></Toast.Viewport></Toast.Portal>
   </Toast.Provider>
