@@ -29,11 +29,11 @@ function CardRoot({ children, testId, style }: { children: ReactNode; testId?: s
 
 function CardHeader({ title, description, icon, action }: { title: string; description?: string; icon?: string; action?: ReactNode }) {
   const { tokens: C } = useTheme()
-  return <div style={{ minHeight: 58, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingRight: 16, borderBottomWidth: 1, borderColor: C.border }}>{icon ? <div style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: C.iconBg }}><Glyph color={C.violet} size={18}>{icon}</Glyph></div> : null}<div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}><text style={{ fontFamily: FONT, fontSize: 15, fontWeight: 700, color: C.text }}>{title}</text>{description ? <text style={{ fontFamily: FONT, fontSize: 11, color: C.muted }}>{description}</text> : null}</div><div style={{ flexGrow: 1 }} />{action}</div>
+  return <div style={{ minHeight: 58, paddingTop: 10, paddingBottom: 10, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingRight: 16, borderBottomWidth: 1, borderColor: C.border }}>{icon ? <div style={{ width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: C.iconBg }}><Glyph color={C.violet} size={18}>{icon}</Glyph></div> : null}<div style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}><text style={{ fontFamily: FONT, fontSize: 15, fontWeight: 700, color: C.text }}>{title}</text>{description ? <text style={{ fontFamily: FONT, fontSize: 11, color: C.muted }}>{description}</text> : null}</div>{action ? <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center' }}>{action}</div> : null}</div>
 }
 
 function CardContent({ children, gap = 13 }: { children: ReactNode; gap?: number }) {
-  return <div style={{ display: 'flex', flexDirection: 'column', gap, padding: 16 }}>{children}</div>
+  return <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap, padding: 16 }}>{children}</div>
 }
 
 export const Card = Object.assign(CardRoot, { Root: CardRoot, Header: CardHeader, Content: CardContent })

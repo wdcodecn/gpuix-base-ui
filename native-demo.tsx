@@ -276,7 +276,7 @@ function DemoCard({ title, description, badge, children }: {
   children: ReactNode
 }) {
   return <Card.Root>
-    <Card.Header title={title} description={description} icon="◈" action={badge ? <Badge tone="info">{badge}</Badge> : undefined} />
+    <Card.Header title={title} description={description} icon="✦" action={badge ? <Badge tone="info">{badge}</Badge> : undefined} />
     <Card.Content gap={10}>{children}</Card.Content>
   </Card.Root>
 }
@@ -583,7 +583,7 @@ export function NativeCapabilitiesDemo() {
   const sections: Array<{ key: string; node: ReactNode }> = [
     {
       key: 'header',
-      node: <DemoCard title="Android 原生能力实验室" description={sdk ? '已连接真实 Android Native Bridge + Hermes 运行时' : '当前处于桌面端预览；请在 Android 真机 APK 测试系统能力'} badge={sdk ? 'Android 已接通' : '桌面只读'}>
+      node: <DemoCard title="Android 原生能力实验室" description={sdk ? 'Android Native Bridge + Hermes 运行时' : '桌面端只读预览；请在 Android 真机 APK 实测'} badge={sdk ? '已接通' : '桌面预览'}>
         <WrapRow>
           <Badge tone={sdk ? 'success' : 'warning'}>{sdk ? 'Bridge Ready' : 'Desktop Preview'}</Badge>
           <Badge tone="neutral">{deviceInfo ? `${deviceInfo.brand} ${deviceInfo.model}` : '设备待读取'}</Badge>
@@ -622,7 +622,7 @@ export function NativeCapabilitiesDemo() {
     },
     {
       key: 'audio',
-      node: <DemoCard title="2. 系统提示音、音量与 TTS 语音" description="RingtoneManager / ToneGenerator / AudioManager / Android TextToSpeech" badge={`媒体音量 ${volumeRatio}`}>
+      node: <DemoCard title="2. 系统提示音、音量与 TTS 语音" description="RingtoneManager / ToneGenerator / AudioManager / Android TextToSpeech" badge={`音量 ${volumeRatio}`}>
         <WrapRow>
           {[
             { type: 'notification', label: '通知音' },

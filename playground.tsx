@@ -9,16 +9,16 @@ import { NativeCapabilitiesDemo, type GpuixNativeSdk } from './native-demo'
 type PageId = 'home' | 'native' | 'proxies' | 'subscriptions' | 'connections' | 'rules' | 'logs' | 'tests' | 'components' | 'settings'
 
 const NAV: { id: PageId; label: string; icon: string }[] = [
-  { id: 'home', label: '首页', icon: '⌂' },
-  { id: 'native', label: '原生', icon: '⚡' },
-  { id: 'proxies', label: '代理', icon: '⌁' },
+  { id: 'home', label: '首页', icon: '▣' },
+  { id: 'native', label: '原生', icon: '✦' },
+  { id: 'proxies', label: '代理', icon: '◇' },
   { id: 'subscriptions', label: '订阅', icon: '▤' },
   { id: 'connections', label: '连接', icon: '◎' },
   { id: 'rules', label: '规则', icon: '⌘' },
-  { id: 'logs', label: '日志', icon: '☷' },
-  { id: 'tests', label: '测试', icon: '♙' },
+  { id: 'logs', label: '日志', icon: '≡' },
+  { id: 'tests', label: '测试', icon: '▷' },
   { id: 'components', label: '组件', icon: '◇' },
-  { id: 'settings', label: '设置', icon: '⚙' },
+  { id: 'settings', label: '设置', icon: '◌' },
 ]
 
 const TITLES: Record<PageId, string> = {
@@ -176,8 +176,8 @@ function PageContent({ page, onNavigate, refreshRateSetting, portraitPhone }: {
   if (page === 'home') return <Home onNavigate={onNavigate} stacked={portraitPhone} />
   if (page === 'native') return <NativeCapabilitiesDemo />
   if (page === 'proxies') return <Proxies mobile={portraitPhone} />
-  if (page === 'subscriptions') return <Subscriptions />
-  if (page === 'connections') return <Connections />
+  if (page === 'subscriptions') return <Subscriptions stacked={portraitPhone} />
+  if (page === 'connections') return <Connections stacked={portraitPhone} />
   if (page === 'components') return <Gallery />
   if (page === 'settings') return <Settings refreshRateSetting={refreshRateSetting} stacked={portraitPhone} />
   return <Placeholder page={page} />
@@ -194,7 +194,7 @@ function Shell() {
   const { width, mobile, compact: landscapeCompact } = useResponsiveViewport()
   const insets = useViewportInsets({ intervalMs: 250 })
   const compact = width < 1180
-  const ownsScroll = page === 'proxies' || page === 'native' || page === 'components' || (mobile && !landscapeCompact && (page === 'settings' || page === 'home'))
+  const ownsScroll = page === 'proxies' || page === 'native' || page === 'components' || (mobile && !landscapeCompact && (page === 'settings' || page === 'home' || page === 'subscriptions' || page === 'connections'))
   useBackHandler(page !== 'home', () => {
     setPage('home')
     return true
@@ -237,7 +237,7 @@ function Shell() {
   return <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'row', position: 'relative', paddingTop: insets.effective.top, paddingBottom: insets.effective.bottom, paddingLeft: insets.effective.left, paddingRight: insets.effective.right, backgroundColor: C.canvas, color: C.text, fontFamily: 'Helvetica' }}>
     <div style={{ width: compact ? 190 : 214, flexShrink: 0, display: 'flex', flexDirection: 'column', padding: compact ? 12 : 16, backgroundColor: C.sidebar, borderRightWidth: 1, borderColor: C.border }}>
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 11, paddingLeft: 8, paddingRight: 8, paddingTop: 8, paddingBottom: 24 }}>
-        <div style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: C.primary }}><Glyph color={C.primaryForeground} size={21}>◈</Glyph></div>
+        <div style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: C.primary }}><Glyph color={C.primaryForeground} size={21}>◇</Glyph></div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}><div style={{ display: 'flex', flexDirection: 'row' }}><text style={{ fontSize: 17, fontWeight: 800, color: C.text }}>GPU</text><text style={{ fontSize: 17, fontWeight: 800, color: C.violet }}>IX</text></div><text style={{ fontSize: 10, color: C.muted }}>component workbench</text></div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>{NAV.map((item) => <NavItem key={item.id} {...item} active={page === item.id} onClick={() => setPage(item.id)} />)}</div>
@@ -266,7 +266,7 @@ function HomeNodeCard({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const [selectedName, setSelectedName] = useState(NODES[1].name)
   const node = NODES.find((item) => item.name === selectedName) ?? NODES[1]
   return <Card.Root style={{ flexGrow: 1 } as never}>
-    <Card.Header title="当前节点" description="延迟与健康状态" icon="⌁" action={<Button size="sm" variant="secondary" onClick={() => onNavigate('proxies')}>切换节点</Button>} />
+    <Card.Header title="当前节点" description="延迟与健康状态" icon="◎" action={<Button size="sm" variant="secondary" onClick={() => onNavigate('proxies')}>切换节点</Button>} />
     <Card.Content><Select.Root value={node.name} onValueChange={(value) => { if (typeof value === 'string') setSelectedName(value) }} items={nodeItems}><Select.Trigger testId="home-node-select"><Select.Value /><Select.Icon /></Select.Trigger><Select.Content>{NODES.map((item) => <Select.Item key={item.name} value={item.name} icon={item.region}>{item.name}</Select.Item>)}</Select.Content></Select.Root><div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}><Badge tone="success">AnyTLS</Badge><Badge tone="neutral">UDP</Badge><text style={{ flexGrow: 1, textAlign: 'right', fontSize: 12, color: C.green }}>{`${node.latency} ms`}</text></div>
     </Card.Content>
   </Card.Root>
@@ -277,7 +277,7 @@ function HomeNetworkCard() {
   const [tun, setTun] = useState(true)
   return <Card.Root style={{ flexGrow: 1 } as never}>
     <Card.Header title="网络设置" description="代理模式与系统行为" icon="⌘" />
-    <Card.Content><div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}><Button width="50%" variant="secondary" icon="▣">系统代理</Button><Button width="50%" variant="primary" icon="⌁">虚拟网卡模式</Button></div><div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 9, backgroundColor: tun ? `${C.green}18` : C.row, borderWidth: 1, borderColor: tun ? `${C.green}55` : C.border }}><div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}><Glyph color={C.green}>▶</Glyph><text style={{ fontSize: 13, fontWeight: 700, color: C.text }}>虚拟网卡模式</text></div><Switch checked={tun} onCheckedChange={setTun} testId="home-tun-switch" /></div>
+    <Card.Content><div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}><Button width="50%" variant="secondary" icon="▣">系统代理</Button><Button width="50%" variant="primary" icon="◎">虚拟网卡模式</Button></div><div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 9, backgroundColor: tun ? `${C.green}18` : C.row, borderWidth: 1, borderColor: tun ? `${C.green}55` : C.border }}><div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}><Glyph color={C.green}>▶</Glyph><text style={{ fontSize: 13, fontWeight: 700, color: C.text }}>虚拟网卡模式</text></div><Switch checked={tun} onCheckedChange={setTun} testId="home-tun-switch" /></div>
     </Card.Content>
   </Card.Root>
 }
@@ -285,10 +285,10 @@ function HomeNetworkCard() {
 function Home({ onNavigate, stacked }: { onNavigate: (page: PageId) => void; stacked: boolean }) {
   const { tokens: C } = useTheme()
   const native = <Card.Root testId="home-native-demo">
-    <Card.Header title={stacked ? "原生能力实验室" : "Android 原生能力实验室"} description={stacked ? "10 项 Android 能力实测" : "通知、语音、中文键盘、网络、传感器等 10 项实测"} icon="◈" action={<Button size="sm" variant="primary" style={{ flexShrink: 0 }} onClick={() => onNavigate('native')}>进入实测 →</Button>} />
+    <Card.Header title={stacked ? "原生能力实验室" : "Android 原生能力实验室"} description={stacked ? "10 项 Android 能力实测" : "通知、语音、中文键盘、网络、传感器等 10 项实测"} icon="✦" action={<Button size="sm" variant="primary" style={{ flexShrink: 0 }} onClick={() => onNavigate('native')}>进入实测 →</Button>} />
   </Card.Root>
   const subscription = <Card.Root testId="home-subscription" style={{ flexGrow: 1 } as never}>
-    <Card.Header title="订阅状态" description="最后更新于 2 分钟前" icon="↻" action={<Button size="sm" variant="secondary" onClick={() => onNavigate('subscriptions')}>管理订阅</Button>} />
+    <Card.Header title="订阅状态" description="最后更新于 2 分钟前" icon="▤" action={<Button size="sm" variant="secondary" onClick={() => onNavigate('subscriptions')}>管理订阅</Button>} />
     <Card.Content><div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10 }}><Badge tone="success">已连接</Badge><text style={{ fontSize: 14, fontWeight: 700, color: C.text }}>workbench-backup.yaml</text></div><text style={{ fontSize: 12, color: C.muted }}>下次自动更新：今天 18:30 · 已使用 62.4 GB / 100 GB</text><div style={{ height: 8, borderRadius: 4, backgroundColor: C.track }}><div style={{ width: '62%', height: 8, borderRadius: 4, backgroundColor: C.violet }} /></div>
     </Card.Content>
   </Card.Root>
@@ -298,7 +298,7 @@ function Home({ onNavigate, stacked }: { onNavigate: (page: PageId) => void; sta
     </Card.Content>
   </Card.Root>
   const traffic = <Card.Root>
-    <Card.Header title="流量统计" description="最近 10 分钟" icon="◒" action={<Button size="sm" variant="ghost" onClick={() => onNavigate('connections')}>查看连接 →</Button>} />
+    <Card.Header title="流量统计" description="最近 10 分钟" icon="◎" action={<Button size="sm" variant="ghost" onClick={() => onNavigate('connections')}>查看连接 →</Button>} />
     <Card.Content><div style={{ height: 128, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 14, borderRadius: 9, backgroundColor: C.control, borderWidth: 1, borderColor: C.border }}><div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}><text style={{ fontSize: 11, color: C.muted }}>实时吞吐</text><div style={{ display: 'flex', flexDirection: 'row', gap: 13 }}><text style={{ fontSize: 11, color: C.orange }}>↑ 1.44 KB/s</text><text style={{ fontSize: 11, color: C.violet }}>↓ 620 B/s</text></div></div><div style={{ height: 52, display: 'flex', flexDirection: 'row', alignItems: 'flex-end', gap: 5 }}>{[22, 28, 20, 36, 30, 48, 35, 44, 32, 54, 42, 58, 51, 64, 46, 70, 58, 74, 65, 78, 68, 84].map((height, index) => <div key={index} style={{ flexGrow: 1, height, borderRadius: 3, backgroundColor: index % 3 === 0 ? C.orange : C.violet, opacity: 0.75 }} />)}</div><text style={{ fontSize: 11, color: C.faint }}>1,240 个采样点</text></div><div style={{ display: 'flex', flexDirection: 'row', gap: 12, paddingTop: 2 }}><Metric label="上传速度" value="1.44" unit="KB/s" tone="warning" /><Metric label="下载速度" value="620" unit="B/s" tone="info" /><Metric label="活跃连接" value="70" unit="条" tone="success" /></div>
     </Card.Content>
   </Card.Root>
@@ -393,17 +393,128 @@ function Proxies({ mobile }: { mobile: boolean }) {
   </List.Root>
 }
 
-function Subscriptions() {
+function Subscriptions({ stacked = false }: { stacked?: boolean }) {
   const { tokens: C } = useTheme()
   const [profile, setProfile] = useState('workbench-backup.yaml')
   const profiles = [{ value: 'workbench-backup.yaml', label: 'workbench-backup.yaml' }, { value: 'personal.yaml', label: 'personal.yaml' }]
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}><Card.Root><Card.Header title="订阅管理" description="管理远程配置与更新策略" icon="▤" action={<Button variant="primary">添加订阅</Button>} /><Card.Content><div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}><div style={{ flexGrow: 1 }}><Select.Root value={profile} onValueChange={(value) => setProfile(value as string)} items={profiles}><Select.Trigger><Select.Value /><Select.Icon /></Select.Trigger><Select.Content>{profiles.map((item) => <Select.Item key={item.value} value={item.value}>{item.label}</Select.Item>)}</Select.Content></Select.Root></div><Button variant="secondary">立即更新</Button></div><div style={{ display: 'flex', flexDirection: 'row', gap: 9, paddingTop: 4 }}><Badge tone="success">更新成功</Badge><text style={{ fontSize: 12, color: C.muted }}>2026-09-17 12:32 · 下次更新 6 小时后</text></div></Card.Content></Card.Root><Card.Root><Card.Header title="新增订阅" description="组件化表单示例" icon="＋" /><Card.Content><Input label="订阅地址" placeholder="https://example.com/profile.yaml" /><div style={{ display: 'flex', flexDirection: 'row', gap: 12 }}><div style={{ flexGrow: 1 }}><Input label="备注" placeholder="工作代理" /></div><div style={{ width: 180 }}><Select.Root defaultValue="每日" items={[{ value: '每日', label: '每日' }, { value: '每周', label: '每周' }, { value: '手动', label: '手动' }]}><Select.Trigger><Select.Value /><Select.Icon /></Select.Trigger><Select.Content><Select.Item value="每日">每日</Select.Item><Select.Item value="每周">每周</Select.Item><Select.Item value="手动">手动</Select.Item></Select.Content></Select.Root></div></div><div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}><Button variant="ghost">取消</Button><Button variant="primary">保存订阅</Button></div></Card.Content></Card.Root></div>
+  const manageCard = <Card.Root>
+    <Card.Header title="订阅管理" description="管理远程配置与更新策略" icon="▤" action={<Button size={stacked ? 'sm' : 'md'} variant="primary">添加订阅</Button>} />
+    <Card.Content>
+      <div style={{ display: 'flex', flexDirection: 'row', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', minWidth: 0 }}>
+        <div style={{ flexGrow: 1, flexBasis: 160, minWidth: 0 }}>
+          <Select.Root value={profile} onValueChange={(value) => setProfile(value as string)} items={profiles}>
+            <Select.Trigger><Select.Value /><Select.Icon /></Select.Trigger>
+            <Select.Content>{profiles.map((item) => <Select.Item key={item.value} value={item.value}>{item.label}</Select.Item>)}</Select.Content>
+          </Select.Root>
+        </div>
+        <Button variant="secondary" style={{ flexShrink: 0 }}>立即更新</Button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 9, paddingTop: 4 }}>
+        <Badge tone="success">更新成功</Badge>
+        <text style={{ fontSize: 12, color: C.muted }}>2026-09-17 12:32 · 下次更新 6 小时后</text>
+      </div>
+    </Card.Content>
+  </Card.Root>
+
+  const addCard = <Card.Root>
+    <Card.Header title="新增订阅" description="组件化表单示例" icon="＋" />
+    <Card.Content>
+      <Input label="订阅地址" placeholder="https://example.com/profile.yaml" />
+      <div style={{ display: 'flex', flexDirection: stacked ? 'column' : 'row', gap: stacked ? 10 : 12, minWidth: 0 }}>
+        <div style={{ flexGrow: stacked ? undefined : 1, width: stacked ? '100%' : undefined, minWidth: 0 }}>
+          <Input label="备注" placeholder="工作代理" />
+        </div>
+        <div style={{ width: stacked ? '100%' : 160, flexShrink: 0, minWidth: 0 }}>
+          <Select.Root defaultValue="每日" items={[{ value: '每日', label: '每日' }, { value: '每周', label: '每周' }, { value: '手动', label: '手动' }]}>
+            <Select.Trigger><Select.Value /><Select.Icon /></Select.Trigger>
+            <Select.Content>
+              <Select.Item value="每日">每日</Select.Item>
+              <Select.Item value="每周">每周</Select.Item>
+              <Select.Item value="手动">手动</Select.Item>
+            </Select.Content>
+          </Select.Root>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+        <Button variant="ghost">取消</Button>
+        <Button variant="primary">保存订阅</Button>
+      </div>
+    </Card.Content>
+  </Card.Root>
+
+  if (stacked) {
+    return <virtual-list estimatedItemHeight={240} overdraw={160} style={{ flexGrow: 1, minHeight: 0, width: '100%' }}>
+      <div key="sub-manage" style={{ width: '100%', paddingBottom: 14 }}>{manageCard}</div>
+      <div key="sub-add" style={{ width: '100%', paddingBottom: 16 }}>{addCard}</div>
+    </virtual-list>
+  }
+
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{manageCard}{addCard}</div>
 }
 
-function Connections() {
+function Connections({ stacked = false }: { stacked?: boolean }) {
   const { tokens: C } = useTheme()
-  const connections = [{ process: 'Cursor', host: 'api.openai.com', rule: 'AI', type: 'TCP' }, { process: 'Safari', host: 'github.com', rule: 'Proxy', type: 'TCP' }, { process: 'Arc', host: 'fonts.gstatic.com', rule: 'Proxy', type: 'TLS' }, { process: 'Telegram', host: '149.154.167.51', rule: 'Global', type: 'TCP' }, { process: 'System', host: 'time.apple.com', rule: 'DIRECT', type: 'UDP' }]
-  return <Card.Root><Card.Header title="活动连接" description="实时网络连接 · 5 个活动" icon="◎" action={<div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}><Input placeholder="搜索进程或域名" /><Button variant="secondary">清理全部</Button></div>} /><Card.Content gap={7}>{connections.map((item) => <div key={item.host} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 8, backgroundColor: C.row, borderWidth: 1, borderColor: C.border }}><div style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: C.iconBg }}><Glyph color={C.violet}>{item.process.slice(0, 1)}</Glyph></div><div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 3 }}><text style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{item.process}</text><text style={{ fontSize: 11, color: C.muted }}>{item.host}</text></div><Badge tone={item.rule === 'DIRECT' ? 'neutral' : 'info'}>{item.rule}</Badge><Badge>{item.type}</Badge><text style={{ width: 58, fontSize: 12, color: C.green, textAlign: 'right' }}>已连接</text></div>)}</Card.Content></Card.Root>
+  const connections = [
+    { process: 'Cursor', host: 'api.openai.com', rule: 'AI', type: 'TCP' },
+    { process: 'Safari', host: 'github.com', rule: 'Proxy', type: 'TCP' },
+    { process: 'Arc', host: 'fonts.gstatic.com', rule: 'Proxy', type: 'TLS' },
+    { process: 'Telegram', host: '149.154.167.51', rule: 'Global', type: 'TCP' },
+    { process: 'System', host: 'time.apple.com', rule: 'DIRECT', type: 'UDP' },
+  ]
+  const renderConnectionRow = (item: typeof connections[number]) => (
+    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: stacked ? 8 : 12, padding: stacked ? 10 : 12, borderRadius: 8, backgroundColor: C.row, borderWidth: 1, borderColor: C.border, minWidth: 0 }}>
+      <div style={{ width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: C.iconBg }}>
+        <Glyph color={C.violet}>{item.process.slice(0, 1)}</Glyph>
+      </div>
+      <div style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <text style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{item.process}</text>
+        <text style={{ fontSize: 11, color: C.muted }}>{item.host}</text>
+      </div>
+      <Badge tone={item.rule === 'DIRECT' ? 'neutral' : 'info'}>{item.rule}</Badge>
+      {!stacked && <Badge>{item.type}</Badge>}
+      <text style={{ width: stacked ? 46 : 58, flexShrink: 0, fontSize: 12, color: C.green, textAlign: 'right', whiteSpace: 'nowrap' }}>已连接</text>
+    </div>
+  )
+
+  if (stacked) {
+    return <virtual-list estimatedItemHeight={84} overdraw={160} style={{ flexGrow: 1, minHeight: 0, width: '100%' }}>
+      <div key="conn-header" style={{ width: '100%', paddingBottom: 10 }}>
+        <Card.Root>
+          <Card.Header title="活动连接" description="实时网络连接 · 5 个活动" icon="◎" />
+          <Card.Content gap={10}>
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0 }}>
+                <Input placeholder="搜索进程或域名" />
+              </div>
+              <Button size="sm" variant="secondary" style={{ flexShrink: 0 }}>清理全部</Button>
+            </div>
+          </Card.Content>
+        </Card.Root>
+      </div>
+      {connections.map((item, idx) => (
+        <div key={item.host} style={{ width: '100%', paddingBottom: idx === connections.length - 1 ? 16 : 8 }}>
+          {renderConnectionRow(item)}
+        </div>
+      ))}
+    </virtual-list>
+  }
+
+  return <Card.Root>
+    <Card.Header
+      title="活动连接"
+      description="实时网络连接 · 5 个活动"
+      icon="◎"
+      action={
+        <div style={{ display: 'flex', flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <div style={{ width: 200 }}><Input placeholder="搜索进程或域名" /></div>
+          <Button variant="secondary">清理全部</Button>
+        </div>
+      }
+    />
+    <Card.Content gap={7}>
+      {connections.map((item) => <div key={item.host}>{renderConnectionRow(item)}</div>)}
+    </Card.Content>
+  </Card.Root>
 }
 
 type RefreshRateRenderer = NativeRenderer & {
@@ -482,7 +593,7 @@ const LANGUAGE_ITEMS = ['中文', 'English'].map((value) => ({ value, label: val
 
 function SystemSettingsCard() {
   return <Card.Root>
-    <Card.Header title="系统设置" description="运行方式与系统集成" icon="⚙" />
+    <Card.Header title="系统设置" description="运行方式与系统集成" icon="⌘" />
     <Card.Content>
       <SettingRow title="虚拟网卡模式" description="应用将通过虚拟网卡访问网络" checked />
       <SettingRow title="系统代理" description="将代理写入系统网络设置" />
@@ -493,7 +604,7 @@ function SystemSettingsCard() {
 
 function ClashSettingsCard() {
   return <Card.Root>
-    <Card.Header title="Clash 设置" description="内核和连接参数" icon="⌁" />
+    <Card.Header title="Clash 设置" description="内核和连接参数" icon="◎" />
     <Card.Content>
       <SettingRow title="统一延迟" description="使用统一延迟测试策略" checked />
       <SettingRow title="IPv6" description="允许 IPv6 出站连接" />
