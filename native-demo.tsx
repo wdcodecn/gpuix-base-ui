@@ -70,12 +70,17 @@ type OtaState = {
   checkOnLaunch: 'manual' | 'background' | 'immediate'
   embeddedFormat: 'hbc' | 'js'
   embeddedBuildId: string
+  hbcVersion?: number
   currentReleaseId: string | null
   currentFormat: 'hbc' | 'js'
   stagedReleaseId: string | null
   previousReleaseId: string | null
   confirmed: boolean
   launchAttempts: number
+  bootCrashStreak?: number
+  rescueMode?: boolean
+  minManifestSeq?: number
+  nativeLaunchCheckStarted?: boolean
   failedReleaseIds: string[]
   lastRollbackReason: string | null
   lastCheckedAt: number
@@ -83,19 +88,23 @@ type OtaState = {
 
 type OtaManifest = {
   schemaVersion: number
+  action?: 'update' | 'rollback_to_embedded'
   appId: string
   channel?: string
   runtimeVersion: string
   releaseId: string
   minVersionCode?: number
+  manifestSeq?: number
   mandatory?: boolean
   notes?: string
   publishedAt?: string
-  bundle: {
+  manifestSignature?: string
+  bundle?: {
     format: 'hbc' | 'js'
     url: string
     sha256: string
     size: number
+    hermesBytecodeVersion?: number
     signature?: string
   }
 }
@@ -112,6 +121,8 @@ export type GpuixNativeSdk = {
   onEvent: (channel: string, fn: (payload: unknown) => void) => Unsubscribe
   onBackPressed: (handler: () => boolean | void) => Unsubscribe
   onDeepLink: (handler: (url: string) => void) => Unsubscribe
+  onAppStateChange?: (fn: (ev: { state: 'active' | 'background' }) => void) => Unsubscribe
+  onNetworkChange?: (fn: (ev: { connected: boolean; networkType: string; isMetered: boolean }) => void) => Unsubscribe
   notifications: {
     areEnabled: () => Promise<{ enabled: boolean; permissionGranted: boolean }>
     show: (opts: { id?: number; title: string; body: string; deepLink?: string; ongoing?: boolean; sound?: boolean }) => Promise<{ id: number; shown: boolean }>
@@ -166,6 +177,8 @@ export type GpuixNativeSdk = {
     canOpenUrl: (url: string) => Promise<{ canOpen: boolean }>
     getInitialUrl: () => Promise<{ url: string | null }>
     share: (opts: { title?: string; text: string; url?: string }) => Promise<{ shared: boolean }>
+    isAppInstalled?: (packageName: string) => Promise<{ installed: boolean }>
+    openMarket?: (packageName?: string) => Promise<{ opened: boolean }>
   }
   permissions: {
     check: (permission: string) => Promise<{ granted: boolean }>
@@ -182,6 +195,11 @@ export type GpuixNativeSdk = {
     write: (service: string, account: string, value: string) => Promise<{ ok: boolean }>
     read: (service: string, account: string) => Promise<{ value: string | null }>
     delete: (service: string, account: string) => Promise<{ ok: boolean }>
+  }
+  fs?: {
+    readText: (path: string, scope?: 'files' | 'cache') => Promise<{ content: string; size: number }>
+    writeText: (path: string, content: string, opts?: { scope?: 'files' | 'cache'; append?: boolean }) => Promise<{ written: number; path: string }>
+    getStorageInfo: () => Promise<{ filesAvailableBytes: number; filesTotalBytes: number; cacheAvailableBytes: number; fsFilesUsedBytes: number; fsCacheUsedBytes: number }>
   }
   media: {
     pickImage: () => Promise<MediaPickResult>
@@ -470,11 +488,14 @@ export function NativeCapabilitiesDemo() {
   const [showWebView, setShowWebView] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  // ── OTA Hot Update ─────────────────────────────────────────────────────────
+  // ── OTA Hot Update & Base Capabilities ─────────────────────────────────────
   const [otaManifestUrl, setOtaManifestUrl] = useState('http://127.0.0.1:8787/manifest.json')
   const [otaState, setOtaState] = useState<OtaState | null>(null)
   const [otaManifest, setOtaManifest] = useState<OtaManifest | null>(null)
   const [otaProgress, setOtaProgress] = useState<string>('尚未检查更新')
+  const [appStateText, setAppStateText] = useState<'active' | 'background'>('active')
+  const [networkText, setNetworkText] = useState<string>('监听中')
+  const [fsSummary, setFsSummary] = useState<string>('尚未操作沙箱文件')
 
   const refreshOtaState = useCallback(async () => {
     if (!sdk?.ota) return
@@ -514,11 +535,21 @@ export function NativeCapabilitiesDemo() {
       const pct = ev.progress >= 0 ? `${Math.round(ev.progress * 100)}%` : `${ev.bytesReceived}B`
       setOtaProgress(`${ev.phase} · ${ev.releaseId} (${pct})`)
     }) ?? (() => undefined)
+    const unsubAppState = sdk.onAppStateChange?.((ev) => {
+      setAppStateText(ev.state)
+      pushLog('info', `App 前后台切换: ${ev.state}`)
+    }) ?? (() => undefined)
+    const unsubNetwork = sdk.onNetworkChange?.((ev) => {
+      setNetworkText(`${ev.connected ? '在线' : '离线'} (${ev.networkType}${ev.isMetered ? '/计费' : ''})`)
+      pushLog('info', `网络状态变化: ${ev.networkType} connected=${String(ev.connected)}`)
+    }) ?? (() => undefined)
 
     return () => {
       unsubNotif()
       unsubLink()
       unsubOtaProgress()
+      unsubAppState()
+      unsubNetwork()
       if (progressTimerRef.current !== null) {
         clearInterval(progressTimerRef.current)
         progressTimerRef.current = null
@@ -806,13 +837,14 @@ export function NativeCapabilitiesDemo() {
           <Badge tone={otaState?.stagedReleaseId ? 'warning' : 'neutral'}>
             {otaState?.stagedReleaseId ? `待生效: ${otaState.stagedReleaseId}` : '无 staged 包'}
           </Badge>
+          {otaState?.rescueMode ? <Badge tone="danger">Rescue 救援中</Badge> : null}
         </WrapRow>
         <Input label="Manifest URL" value={otaManifestUrl} onChange={setOtaManifestUrl} placeholder="https://.../manifest.json" />
         <WrapRow>
           <Button size="sm" variant="secondary" onClick={() => void runTask('读取 OTA 状态', (s) => s.ota.getState(), (r) => setOtaState(r))}>刷新状态</Button>
           <Button size="sm" onClick={() => void runTask('检查 OTA 更新', (s) => s.ota.check({ manifestUrl: otaManifestUrl }), (r) => {
             setOtaManifest(r.manifest)
-            setOtaProgress(r.available ? `发现新版本 ${r.manifest.releaseId} (${r.manifest.bundle.size}B)` : `无需更新 (${r.reason ?? 'up_to_date'})`)
+            setOtaProgress(r.available ? `发现新版本 ${r.manifest.releaseId} (${r.manifest.bundle?.size ?? 0}B)` : `无需更新 (${r.reason ?? 'up_to_date'})`)
             void refreshOtaState()
           })}>检查更新</Button>
           <Button size="sm" variant="primary" onClick={() => void runTask('下载 OTA 包', (s) => s.ota.download(otaManifest ? { manifest: otaManifest } : { manifestUrl: otaManifestUrl }), (r) => {
@@ -830,10 +862,19 @@ export function NativeCapabilitiesDemo() {
         </WrapRow>
         <text style={{ fontSize: 11, color: C.muted }}>
           {otaState
-            ? `当前 Release: ${otaState.currentReleaseId ?? '(APK 内置)'} · BuildID: ${otaState.embeddedBuildId.slice(0, 12) || '--'} · 黑名单: ${otaState.failedReleaseIds.join(', ') || '无'} · 回滚原因: ${otaState.lastRollbackReason ?? '无'}`
+            ? `当前 Release: ${otaState.currentReleaseId ?? '(APK 内置)'} · BuildID: ${otaState.embeddedBuildId.slice(0, 12) || '--'} · HBCv${otaState.hbcVersion ?? '--'} · Streak: ${otaState.bootCrashStreak ?? 0} · 黑名单: ${otaState.failedReleaseIds.join(', ') || '无'} · 回滚原因: ${otaState.lastRollbackReason ?? '无'}`
             : '请连接 Android 宿主后读取 OTA 状态（可配合 gpuix ota serve 本地联调）'}
         </text>
-        <text style={{ fontSize: 11, color: C.muted }}>{`状态/进度：${otaProgress}`}</text>
+        <WrapRow>
+          <Button size="sm" variant="secondary" onClick={() => void runTask('沙箱文件写入+读取', async (s) => {
+            if (!s.fs) throw new Error('fs 插件未就绪')
+            await s.fs.writeText('demo/hello.txt', `GPUIX @ ${Date.now()}`, { scope: 'cache' })
+            const readRes = await s.fs.readText('demo/hello.txt', 'cache')
+            const info = await s.fs.getStorageInfo()
+            return { readRes, info }
+          }, (r) => setFsSummary(`已读写: "${r.readRes.content}" · 可用 ${Math.round(r.info.filesAvailableBytes / (1024 * 1024))} MiB`))}>测试沙箱 FS</Button>
+        </WrapRow>
+        <text style={{ fontSize: 11, color: C.muted }}>{`状态/进度：${otaProgress} · 前后台: ${appStateText} · 网络: ${networkText} · ${fsSummary}`}</text>
       </DemoCard>,
     },
   ]
