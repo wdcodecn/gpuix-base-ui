@@ -58,6 +58,56 @@ type LocationResult = {
   timestamp: number
 }
 
+type OtaState = {
+  source: 'embedded' | 'ota'
+  appId: string
+  versionName: string
+  versionCode: number
+  runtimeVersion: string
+  channel: string
+  manifestUrl: string | null
+  hasPublicKey: boolean
+  checkOnLaunch: 'manual' | 'background' | 'immediate'
+  embeddedFormat: 'hbc' | 'js'
+  embeddedBuildId: string
+  currentReleaseId: string | null
+  currentFormat: 'hbc' | 'js'
+  stagedReleaseId: string | null
+  previousReleaseId: string | null
+  confirmed: boolean
+  launchAttempts: number
+  failedReleaseIds: string[]
+  lastRollbackReason: string | null
+  lastCheckedAt: number
+}
+
+type OtaManifest = {
+  schemaVersion: number
+  appId: string
+  channel?: string
+  runtimeVersion: string
+  releaseId: string
+  minVersionCode?: number
+  mandatory?: boolean
+  notes?: string
+  publishedAt?: string
+  bundle: {
+    format: 'hbc' | 'js'
+    url: string
+    sha256: string
+    size: number
+    signature?: string
+  }
+}
+
+type OtaProgressEvent = {
+  releaseId: string
+  bytesReceived: number
+  totalBytes: number
+  progress: number
+  phase: 'downloading' | 'verifying' | 'ready'
+}
+
 export type GpuixNativeSdk = {
   onEvent: (channel: string, fn: (payload: unknown) => void) => Unsubscribe
   onBackPressed: (handler: () => boolean | void) => Unsubscribe
@@ -140,6 +190,17 @@ export type GpuixNativeSdk = {
   }
   location: {
     getCurrentPosition: () => Promise<LocationResult>
+  }
+  ota: {
+    getState: () => Promise<OtaState>
+    check: (opts?: { manifestUrl?: string; channel?: string; timeoutMs?: number; headers?: Record<string, string> }) => Promise<{ available: boolean; reason: string | null; currentReleaseId: string | null; stagedReleaseId: string | null; embeddedBuildId: string; manifest: OtaManifest }>
+    download: (opts?: { manifest?: OtaManifest; manifestUrl?: string; timeoutMs?: number; headers?: Record<string, string> }) => Promise<OtaState & { downloaded: boolean; reused: boolean; releaseId: string; bytes?: number }>
+    apply: (opts?: { mode?: 'hot' | 'next_launch' | 'restart' }) => Promise<OtaState & { applied: boolean; mode: string; releaseId: string }>
+    confirm: () => Promise<OtaState & { confirmedNow: boolean }>
+    rollback: (opts?: { applyNow?: boolean; mode?: 'hot' | 'restart'; reason?: string }) => Promise<OtaState & { rolledBackFrom: string | null }>
+    reset: (opts?: { applyNow?: boolean }) => Promise<OtaState & { reset: boolean }>
+    setManualConfirm: (enabled: boolean) => void
+    onProgress: (fn: (ev: OtaProgressEvent) => void) => Unsubscribe
   }
 }
 
@@ -409,8 +470,28 @@ export function NativeCapabilitiesDemo() {
   const [showWebView, setShowWebView] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
 
+  // ── OTA Hot Update ─────────────────────────────────────────────────────────
+  const [otaManifestUrl, setOtaManifestUrl] = useState('http://127.0.0.1:8787/manifest.json')
+  const [otaState, setOtaState] = useState<OtaState | null>(null)
+  const [otaManifest, setOtaManifest] = useState<OtaManifest | null>(null)
+  const [otaProgress, setOtaProgress] = useState<string>('尚未检查更新')
+
+  const refreshOtaState = useCallback(async () => {
+    if (!sdk?.ota) return
+    try {
+      const next = await sdk.ota.getState()
+      setOtaState(next)
+      if (next.manifestUrl) {
+        setOtaManifestUrl(next.manifestUrl)
+      }
+    } catch (err) {
+      pushLog('warning', `读取 OTA 状态失败: ${errorText(err)}`)
+    }
+  }, [sdk, pushLog])
+
   useEffect(() => {
     void refreshDevice()
+    void refreshOtaState()
     if (!sdk) return
     void sdk.launcher.getInitialUrl().then((r) => {
       if (r.url) setInitialUrl(r.url)
@@ -429,10 +510,15 @@ export function NativeCapabilitiesDemo() {
       setLastDeepLink(url)
       pushLog('info', `收到 DeepLink: ${url}`)
     })
+    const unsubOtaProgress = sdk.ota?.onProgress((ev) => {
+      const pct = ev.progress >= 0 ? `${Math.round(ev.progress * 100)}%` : `${ev.bytesReceived}B`
+      setOtaProgress(`${ev.phase} · ${ev.releaseId} (${pct})`)
+    }) ?? (() => undefined)
 
     return () => {
       unsubNotif()
       unsubLink()
+      unsubOtaProgress()
       if (progressTimerRef.current !== null) {
         clearInterval(progressTimerRef.current)
         progressTimerRef.current = null
@@ -445,7 +531,7 @@ export function NativeCapabilitiesDemo() {
         void sdk.sensors.stop(sType).catch(() => undefined)
       }
     }
-  }, [sdk, refreshDevice, pushLog])
+  }, [sdk, refreshDevice, refreshOtaState, pushLog])
 
   const springTargets = [
     { x: 0, y: 0 },
@@ -703,6 +789,51 @@ export function NativeCapabilitiesDemo() {
             style: { width: '100%', height: 180, borderRadius: 8, borderWidth: 1, borderColor: C.borderStrong },
           })}
         </div>}
+      </DemoCard>,
+    },
+    {
+      key: 'ota',
+      node: <DemoCard
+        title="11. OTA 生产热更新（免重装 APK）"
+        description="基于静态 manifest.json + Hermes .hbc + SHA-256 / ECDSA 验签 + 崩溃自愈回滚"
+        badge={otaState ? `${otaState.source.toUpperCase()} · ${otaState.confirmed ? '已确认' : '待确认'}` : '待读取'}
+      >
+        <WrapRow>
+          <Badge tone={otaState?.source === 'ota' ? 'success' : 'info'}>
+            {otaState ? `运行源: ${otaState.source}` : '运行源: --'}
+          </Badge>
+          <Badge tone="neutral">{otaState ? `runtime ${otaState.runtimeVersion} (${otaState.channel})` : 'runtime --'}</Badge>
+          <Badge tone={otaState?.stagedReleaseId ? 'warning' : 'neutral'}>
+            {otaState?.stagedReleaseId ? `待生效: ${otaState.stagedReleaseId}` : '无 staged 包'}
+          </Badge>
+        </WrapRow>
+        <Input label="Manifest URL" value={otaManifestUrl} onChange={setOtaManifestUrl} placeholder="https://.../manifest.json" />
+        <WrapRow>
+          <Button size="sm" variant="secondary" onClick={() => void runTask('读取 OTA 状态', (s) => s.ota.getState(), (r) => setOtaState(r))}>刷新状态</Button>
+          <Button size="sm" onClick={() => void runTask('检查 OTA 更新', (s) => s.ota.check({ manifestUrl: otaManifestUrl }), (r) => {
+            setOtaManifest(r.manifest)
+            setOtaProgress(r.available ? `发现新版本 ${r.manifest.releaseId} (${r.manifest.bundle.size}B)` : `无需更新 (${r.reason ?? 'up_to_date'})`)
+            void refreshOtaState()
+          })}>检查更新</Button>
+          <Button size="sm" variant="primary" onClick={() => void runTask('下载 OTA 包', (s) => s.ota.download(otaManifest ? { manifest: otaManifest } : { manifestUrl: otaManifestUrl }), (r) => {
+            setOtaState(r)
+            setOtaProgress(`已下载并校验: ${r.releaseId}`)
+          })}>下载包</Button>
+          <Button size="sm" variant="primary" onClick={() => void runTask('立即热切换', (s) => s.ota.apply({ mode: 'hot' }), (r) => {
+            setOtaState(r)
+            setOtaProgress(`正在热切换至 ${r.releaseId}...`)
+          })}>立即热切换</Button>
+          <Button size="sm" variant="secondary" onClick={() => void runTask('冷重启生效', (s) => s.ota.apply({ mode: 'restart' }), (r) => setOtaState(r))}>冷重启生效</Button>
+          <Button size="sm" onClick={() => void runTask('确认当前 OTA 稳定', (s) => s.ota.confirm(), (r) => setOtaState(r))}>确认稳定</Button>
+          <Button size="sm" variant="destructive" onClick={() => void runTask('回滚版本', (s) => s.ota.rollback({ applyNow: true, mode: 'hot', reason: 'manual demo rollback' }), (r) => setOtaState(r))}>回滚</Button>
+          <Button size="sm" variant="ghost" onClick={() => void runTask('重置回内置包', (s) => s.ota.reset({ applyNow: true }), (r) => setOtaState(r))}>重置回内置</Button>
+        </WrapRow>
+        <text style={{ fontSize: 11, color: C.muted }}>
+          {otaState
+            ? `当前 Release: ${otaState.currentReleaseId ?? '(APK 内置)'} · BuildID: ${otaState.embeddedBuildId.slice(0, 12) || '--'} · 黑名单: ${otaState.failedReleaseIds.join(', ') || '无'} · 回滚原因: ${otaState.lastRollbackReason ?? '无'}`
+            : '请连接 Android 宿主后读取 OTA 状态（可配合 gpuix ota serve 本地联调）'}
+        </text>
+        <text style={{ fontSize: 11, color: C.muted }}>{`状态/进度：${otaProgress}`}</text>
       </DemoCard>,
     },
   ]

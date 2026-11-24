@@ -89,7 +89,7 @@ GPUIX 已具备独立 Hermes、React 保留树、GPX1 增量提交、Rust/GPUI �
 
 帧率诊断复用应用主题。手机竖屏浮窗在导航下方靠右展开，收起为页头读数。诊断显示 GPUI 原生绘制次数和绘制耗时，实际呈现间隔使用 SurfaceFlinger 测量。按秒读取统计，少量孤立绘制保留「待滑动」，避免统计自身引起持续重绘。面板打开并静止后，4 秒 TimeStats 窗口内没有记录到 GPUIX 图层的新帧。
 
-期间两次覆盖安装后快速重新拉起出现原生断言 `must construct App on main thread`。该断言来自 Android 原生宿主，当前宿主按进程缓存 GPUI 平台及其所有线程身份。最终包完成冷启动、滚动复测和同进程退后台再返回。Activity 重建的原生生命周期路径仍需单独修复与验证。
+期间两次覆盖安装后快速重新拉起出现原生断言 `must construct App on main thread`。该断言来自 Android 原生宿主，已于 2026-11-24 在 `gpuix-android` 中通过线程无关每会话重建与主动会话让位交接彻底根治（验证见第 8 节）。
 
 完成包 SHA-256 `29810731347db5b2fb9dcfb4f050981ad1979afe38ea287737e2324f119a0c47`，21,400,593 B。
 
@@ -102,6 +102,16 @@ GPUIX 已具备独立 Hermes、React 保留树、GPX1 增量提交、Rust/GPUI �
 | 诊断本身影响读数和帧率 | 使用原生累计绘制统计，按需低频采样。用静置与持续滚动两个场景确认读数能停、能更新，再关闭诊断采 SurfaceFlinger 的应用图层。 |
 | 把不同阶段的数字混成「120 FPS」 | 记录面板模式、实际呈现间隔 P50/P99 和提交到呈现耗时。触摸到像素单独测。以相同 Release、设备状态和手势复跑，保留异常首轮。 |
 | 装错版本或自动输入打到别的 App | 对照本地 APK 与设备已装 APK 的 SHA-256。发手势前确认 `topResumedActivity` 是目标 App，采样后再核对目标图层与进程。覆盖安装后先等进程状态稳定，再决定是否显式拉起。 |
-| 把正常回前台当成 Activity 重建通过 | 分别验证冷启动、同进程后台恢复、Activity 销毁重建。Android 宿主改生命周期时，用实际重建场景回归 `must construct App on main thread` 断言，核对 native 平台、线程身份与 Hermes 实例的生命周期。 |
+| 把正常回前台当成 Activity 重建通过 | 分别验证冷启动、同进程后台恢复、Activity 销毁重建（含 `FLAG_ACTIVITY_CLEAR_TASK` 并发交接）。Android 宿主改生命周期时，用实际重建场景回归 `must construct App on main thread` 断言，核对 native 平台、线程身份与 Hermes 实例的生命周期。 |
 
-发布记录同时写明 APK 哈希、构建配置、实测设备、已验收场景及仍开放的问题。当前首页的成绩仅覆盖 PKC110 竖屏短时固定手势。Activity 重建、长时温控、横屏和多机型仍需各自的验收数据。
+发布记录同时写明 APK 哈希、构建配置、实测设备、已验收场景及仍开放的问题。当前首页的成绩仅覆盖 PKC110 竖屏短时固定手势；长时温控、横屏和多机型仍需各自的验收数据。
+
+## 8. 2026-11-24 自动化单测与重建压测复验
+
+- **组件库自动化测试与静态检查**：新增 [tests/base-ui.test.ts](../tests/base-ui.test.ts)，`bun test` 6 pass / 0 fail（46 expect() calls），`bun run check`（`oxlint --type-aware --type-check` + `tsc --noEmit`）0 errors / 0 warnings，`npm pack --dry-run` 通过；CI 已纳入 `bun test`。
+- **最新构建与 16KB 对齐校验**：`gpuix-base-ui-release.apk` 体积 `17,635,557 B`（`16.8 MiB`，`sha256=f86bbd1fb120`，`app.hbc` `1,344,284 B`），`arm64-v8a` 64 位 `.so` 16KB ELF `LOAD` 页对齐门禁通过；二次热缓存构建耗时 `1.38 s`（`1,375 ms`）。
+- **OPPO PKC110（`SWS8GUDUGIHECIMN`）真机复测**：
+  - 冷启动 `TotalTime: 659 ms`；
+  - 同进程 `FLAG_ACTIVITY_CLEAR_TASK` 连续 3 轮销毁重建均于 `262 ms` / `273 ms` / `329 ms`（`LaunchState: WARM`）恢复运行（PID 保持 `23461`），logcat 确认 3 次完整执行主动退场→清理→新建→Hermes 加载，`must construct App on main thread`、`PANIC`、`FATAL EXCEPTION` 均为 **0 次**；
+  - 交互滑动后 `gpuix bench` 在图层 `VRI-dev.gpuix.baseui/dev.gpui.mobile.GpuiActivity#267876` 采样 `N=62` 帧间隔，实测 **`P50=8.33 ms`、`P99=8.53 ms`，估算 `120.1 fps`（panel 120 Hz）**。
+- **OTA 热更新合并与最终构建验收**：`native-demo.tsx` 已接入 OTA 交互卡片；`bun run check`（`oxlint --type-aware --type-check` + `tsc --noEmit`）0 errors / 0 warnings，`bun test` 6 pass / 0 fail（46 expect() calls），`npm pack --dry-run`（67 files）通过；最终版 `gpuix-base-ui-release.apk` 体积 **`17,710,039 B`（`16.89 MiB`，`sha256=3c2a222eb57b237677cfacbcbf1b0f2e6c395d5e57dd1880c20d8c369d3da2c0`）**，内含 `assets/gpuix/app.hbc`（`1,349,443 B`）与 `assets/gpuix/ota-meta.kv`（`256 B`），16KB ELF 对齐校验通过，二次热缓存构建耗时 **`1.59 s`**（打包时未连接 ADB 设备，合并包待连机复测）。
