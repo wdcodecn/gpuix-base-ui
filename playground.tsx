@@ -6,6 +6,64 @@ import { useViewportInsets, useViewportSize } from './src/base/foundations'
 import { Gallery } from './gallery'
 import { NativeCapabilitiesDemo, type GpuixNativeSdk } from './native-demo'
 
+type AppInfo = {
+  appId: string
+  appName: string
+  versionName: string
+  versionCode: number
+  platform: string
+  channel: string
+  runtimeVersion: string
+  buildHash: string
+}
+
+function readStringField(source: object, key: string, fallback: string): string {
+  const value = Reflect.get(source, key)
+  return typeof value === 'string' && value.length > 0 ? value : fallback
+}
+
+function readNumberField(source: object, key: string, fallback: number): number {
+  const value = Reflect.get(source, key)
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function readAppInfo(): AppInfo {
+  const raw = Reflect.get(globalThis, '__gpuixAppInfo')
+  const runtimePlatform = Reflect.get(globalThis, '__gpuixPlatform')
+  const defaultPlatform =
+    typeof runtimePlatform === 'string' && runtimePlatform.length > 0
+      ? runtimePlatform
+      : Reflect.get(globalThis, '__gpuixAndroid')
+        ? 'android'
+        : 'desktop'
+  if (typeof raw !== 'object' || raw === null) {
+    return {
+      appId: 'dev.gpuix.baseui',
+      appName: 'GPUIX Base UI',
+      versionName: '1.0.0',
+      versionCode: 1,
+      platform: defaultPlatform,
+      channel: 'local',
+      runtimeVersion: '1',
+      buildHash: 'dev',
+    }
+  }
+  return {
+    appId: readStringField(raw, 'appId', 'dev.gpuix.baseui'),
+    appName: readStringField(raw, 'appName', 'GPUIX Base UI'),
+    versionName: readStringField(raw, 'versionName', '1.0.0'),
+    versionCode: readNumberField(raw, 'versionCode', 1),
+    platform: readStringField(raw, 'platform', defaultPlatform),
+    channel: readStringField(raw, 'channel', 'local'),
+    runtimeVersion: readStringField(raw, 'runtimeVersion', '1'),
+    buildHash: readStringField(raw, 'buildHash', 'dev'),
+  }
+}
+
+function isMobileHost(): boolean {
+  return Boolean(Reflect.get(globalThis, '__gpuixMobile') || Reflect.get(globalThis, '__gpuixAndroid'))
+}
+
 type PageId = 'home' | 'native' | 'proxies' | 'subscriptions' | 'connections' | 'rules' | 'logs' | 'tests' | 'components' | 'settings'
 
 const NAV: { id: PageId; label: string; icon: string }[] = [
@@ -215,6 +273,7 @@ function Shell() {
   const mobileHeaderHeight = landscapeCompact ? 44 : 56
   const mobileNavItemHeight = landscapeCompact ? 34 : 42
   const mobileNavGap = landscapeCompact ? 3 : 4
+  const appInfo = useMemo(() => readAppInfo(), [])
   const mobileNavPadding = landscapeCompact ? 5 : 8
   const mobileNavHeight = mobileNavItemHeight * 2 + mobileNavGap + mobileNavPadding * 2 + 1
   const panelGap = landscapeCompact ? 8 : (mobileHeaderHeight - 40) / 2 + mobileNavHeight + 8
@@ -222,7 +281,7 @@ function Shell() {
   if (mobile) return <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', paddingTop: insets.effective.top, paddingBottom: insets.effective.bottom, paddingLeft: insets.effective.left, paddingRight: insets.effective.right, backgroundColor: C.canvas, color: C.text, fontFamily: 'sans-serif' }}>
     <div style={{ height: mobileHeaderHeight, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', paddingLeft: landscapeCompact ? 10 : 16, paddingRight: landscapeCompact ? 10 : 16, gap: landscapeCompact ? 7 : 10, backgroundColor: C.panel }}>
       <text style={{ flexGrow: 1, fontSize: 20, fontWeight: 800, color: C.text }}>{TITLES[page]}</text>
-      <Badge tone="info">GPUIX</Badge>
+      <Badge tone="info">{`v${appInfo.versionName}`}</Badge>
       <Button testId="mobile-theme" size="sm" variant="secondary" style={{ height: landscapeCompact ? 36 : 42, minWidth: landscapeCompact ? 58 : 68 }} onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}>{mode === 'light' ? '深色' : '浅色'}</Button>
       <PerformanceControl compact={landscapeCompact} panelGap={panelGap} />
     </div>
@@ -252,7 +311,7 @@ function Shell() {
     <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ height: 66, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 25, paddingRight: 25, backgroundColor: C.panel, borderBottomWidth: 1, borderColor: C.border }}>
         <text style={{ fontSize: 21, fontWeight: 800, color: C.text }}>{TITLES[page]}</text><div style={{ flexGrow: 1 }} />
-        <Badge tone="info">GPUIX native</Badge><PerformanceControl /><IconButton label="帮助">?</IconButton><IconButton label="更多">•••</IconButton>
+        <Badge tone="info">{`GPUIX native · v${appInfo.versionName}`}</Badge><PerformanceControl /><IconButton label="帮助">?</IconButton><IconButton label="更多">•••</IconButton>
       </div>
       <div key={page} style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: ownsScroll ? 'hidden' : 'scroll', flexBasis: 0, padding: 22 }}>
         <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexShrink: ownsScroll ? 1 : 0, minHeight: 0, minWidth: 0 }}><PageContent page={page} onNavigate={setPage} refreshRateSetting={refreshRateSetting} portraitPhone={false} /></div>
@@ -284,8 +343,15 @@ function HomeNetworkCard() {
 
 function Home({ onNavigate, stacked }: { onNavigate: (page: PageId) => void; stacked: boolean }) {
   const { tokens: C } = useTheme()
+  const appInfo = useMemo(() => readAppInfo(), [])
+  const isIos = appInfo.platform === 'ios'
+  const isAndroid = appInfo.platform === 'android'
+  const nativeTitle = stacked ? '原生能力实验室' : isIos ? 'iOS 原生能力实验室' : isAndroid ? 'Android 原生能力实验室' : '移动端原生能力实验室'
+  const nativeDesc = stacked
+    ? isAndroid ? '10 项 Android 能力实测' : '跨端与原生渲染能力实测'
+    : '通知、语音、中文键盘、网络、传感器与 OTA 等实测'
   const native = <Card.Root testId="home-native-demo">
-    <Card.Header title={stacked ? "原生能力实验室" : "Android 原生能力实验室"} description={stacked ? "10 项 Android 能力实测" : "通知、语音、中文键盘、网络、传感器等 10 项实测"} icon="✦" action={<Button size="sm" variant="primary" style={{ flexShrink: 0 }} onClick={() => onNavigate('native')}>进入实测 →</Button>} />
+    <Card.Header title={nativeTitle} description={nativeDesc} icon="✦" action={<Button size="sm" variant="primary" style={{ flexShrink: 0 }} onClick={() => onNavigate('native')}>进入实测 →</Button>} />
   </Card.Root>
   const subscription = <Card.Root testId="home-subscription" style={{ flexGrow: 1 } as never}>
     <Card.Header title="订阅状态" description="最后更新于 2 分钟前" icon="▤" action={<Button size="sm" variant="secondary" onClick={() => onNavigate('subscriptions')}>管理订阅</Button>} />
@@ -649,15 +715,38 @@ function Settings({ refreshRateSetting, stacked }: {
   refreshRateSetting: RefreshRateSettingProps
   stacked: boolean
 }) {
+  const { tokens: C } = useTheme()
+  const appInfo = useMemo(() => readAppInfo(), [])
   const performanceCard = <Card.Root>
     <Card.Header title="性能与省电" description="待机与高刷策略" icon="◌" />
     <Card.Content><RefreshRateSetting {...refreshRateSetting} /></Card.Content>
+  </Card.Root>
+  const versionRows: [string, string][] = [
+    ['版本', `v${appInfo.versionName} (${appInfo.versionCode})`],
+    ['运行平台', appInfo.platform],
+    ['应用标识', appInfo.appId],
+    ['构建哈希', appInfo.buildHash],
+    ['发布通道', `${appInfo.channel} · runtime ${appInfo.runtimeVersion}`],
+  ]
+  const versionCard = <Card.Root testId="settings-version-card">
+    <Card.Header title="版本与构建信息" description="运行时与分发标识" icon="◈" />
+    <Card.Content>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {versionRows.map(([label, value]) => (
+          <div key={label} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingTop: 2, paddingBottom: 2 }}>
+            <text style={{ fontSize: 12, color: C.muted }}>{label}</text>
+            <text style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{value}</text>
+          </div>
+        ))}
+      </div>
+    </Card.Content>
   </Card.Root>
   if (stacked) return <virtual-list
     estimatedItemHeight={240}
     overdraw={120}
     style={{ flexGrow: 1, minHeight: 0, width: '100%' }}
   >
+    <div key="version" style={{ paddingBottom: 16 }}>{versionCard}</div>
     <div key="performance" style={{ paddingBottom: 16 }}>{performanceCard}</div>
     <div key="system" style={{ paddingBottom: 14 }}><SystemSettingsCard /></div>
     <div key="clash" style={{ paddingBottom: 16 }}><ClashSettingsCard /></div>
@@ -665,6 +754,7 @@ function Settings({ refreshRateSetting, stacked }: {
   </virtual-list>
 
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'stretch' }}>
+    {versionCard}
     {performanceCard}
     <div style={{ display: 'flex', flexDirection: 'row', gap: 16, alignItems: 'stretch' }}>
       <div style={{ width: '50%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -686,6 +776,6 @@ function Placeholder({ page }: { page: PageId }) {
   return <Card.Root><Card.Header title={TITLES[page]} description="同一套组件可以继续组合出更多业务页面" icon="◇" /><Card.Content><div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, paddingTop: 60, paddingBottom: 60 }}><div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: C.iconBg }}><Glyph color={C.violet} size={24}>✦</Glyph></div><text style={{ fontSize: 15, fontWeight: 700, color: C.text }}>页面骨架已就绪</text><text style={{ fontSize: 12, color: C.muted }}>可以直接复用 Card、Tabs、Select、Switch 和主题 token。</text></div></Card.Content></Card.Root>
 }
 
-render(<ThemeProvider initialMode="dark"><Shell /></ThemeProvider>, Reflect.get(globalThis, '__gpuixAndroid')
+render(<ThemeProvider initialMode="dark"><Shell /></ThemeProvider>, isMobileHost()
   ? { title: 'GPUIX Base UI' }
   : { title: 'gpuix-base-ui', width: 1280, height: 860, minWidth: 1024, minHeight: 768, resizable: true })

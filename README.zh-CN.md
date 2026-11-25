@@ -80,14 +80,13 @@ bun run dev
   Dialog/AlertDialog/Drawer/Popover/Tooltip、Select/Combobox/Autocomplete、
   表单校验、Slider 拖动、OTP 跳格、Toast、ScrollArea、Tabs、Accordion 等。
 
-## Android 配套
+## 移动端配套（Android & iOS）
 
-使用同级目录的 [`gpuix-android`](https://github.com/wdcodecn/gpuix-android) 在真机运行这个
-九页工作台。首次执行 `init` 为 `playground.tsx` 生成 Android 宿主。
+使用同级目录的 [`gpuix-mobile`](https://github.com/wdcodecn/gpuix-mobile) 在 Android 设备或 iOS 模拟器中运行这个九页工作台（项目配置见 `gpuix.config.json`）。
 
 ```sh
-bun ../gpuix-android/scripts/gpuix.ts init --entry playground.tsx --app-id dev.gpuix.baseui --name "GPUIX Base UI"
-bun ../gpuix-android/scripts/gpuix.ts run DEVICE_SERIAL
+bun ../gpuix-mobile/scripts/gpuix.ts run ios
+bun ../gpuix-mobile/scripts/gpuix.ts run android DEVICE_SERIAL
 ```
 
 ## 发布

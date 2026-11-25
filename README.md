@@ -88,15 +88,15 @@ The playground contains nine product-style pages plus an interactive component
 gallery. The proxy page exercises a 5,000-row native virtual list with a
 100-row application window.
 
-## Android companion
+## Mobile companion (Android & iOS)
 
-Use the sibling [`gpuix-android`](https://github.com/wdcodecn/gpuix-android)
-checkout to run this nine-page playground on an Android device. Run `init`
-once to generate the host for `playground.tsx`.
+Use the sibling [`gpuix-mobile`](https://github.com/wdcodecn/gpuix-mobile)
+checkout to run this nine-page playground on an Android device or iOS Simulator.
+Configuration lives in `gpuix.config.json`.
 
 ```sh
-bun ../gpuix-android/scripts/gpuix.ts init --entry playground.tsx --app-id dev.gpuix.baseui --name "GPUIX Base UI"
-bun ../gpuix-android/scripts/gpuix.ts run DEVICE_SERIAL
+bun ../gpuix-mobile/scripts/gpuix.ts run ios
+bun ../gpuix-mobile/scripts/gpuix.ts run android DEVICE_SERIAL
 ```
 
 ## License

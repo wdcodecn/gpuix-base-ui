@@ -398,7 +398,7 @@ export function NativeCapabilitiesDemo() {
     setFetchResult('请求中...')
     try {
       const resp = await fetchFn(fetchUrl, method === 'POST'
-        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client: 'gpuix-android', ts: started }) }
+        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client: 'gpuix-mobile', ts: started }) }
         : { method: 'GET' })
       const body = await resp.text()
       const elapsed = Date.now() - started

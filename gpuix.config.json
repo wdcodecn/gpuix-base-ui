@@ -1,0 +1,13 @@
+{
+  "entrypoint": "playground.tsx",
+  "appId": "dev.gpuix.baseui",
+  "appName": "GPUIX Base UI",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "ios": {
+    "bundleId": "dev.gpuix.baseui",
+    "buildNumber": "1",
+    "deploymentTarget": "17.0",
+    "statusBarStyle": "light"
+  }
+}
