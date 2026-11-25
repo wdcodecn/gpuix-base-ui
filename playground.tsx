@@ -623,7 +623,7 @@ function RefreshRateSetting({ initialValue, onChange }: RefreshRateSettingProps)
     }
   }, [nativeRenderer])
   const apply = useCallback((next: RefreshRatePreference) => {
-    if (Reflect.get(globalThis, '__gpuixAndroid')) {
+    if (isMobileHost()) {
       nativeRenderer?.setPowerFrameRate?.(Number(next.enabled ? next.rate : DEFAULT_INTERACTION_REFRESH_RATE))
     }
     setPreference(next)
